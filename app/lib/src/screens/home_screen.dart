@@ -4,7 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../prompts.dart';
-import '../services/gemma_service.dart';
+import '../services/model_router.dart';
 import '../services/stt_service.dart';
 import '../services/tts_service.dart';
 
@@ -103,7 +103,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await TtsService.instance.speak(StatusTexts.thinking);
 
       final buffer = StringBuffer();
-      await for (final token in GemmaService.instance.ask(jpeg, question)) {
+      await for (final token in ModelRouter.ask(jpeg, question)) {
         buffer.write(token);
         if (mounted) setState(() => _answer = buffer.toString());
       }

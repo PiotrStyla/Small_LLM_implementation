@@ -71,6 +71,21 @@ class LmEmbeds(nn.Module):
         ).logits
 
 
+class EmbedTokens(nn.Module):
+    """ids (1,S) int64 → embeddy tokenu (1,S,768).
+
+    Bez tego grafu aplikacja nie potrafi dołożyć wektora kolejnego tokenu
+    w dekodowaniu greedy (graf LM je `inputs_embeds`, nie `ids`).
+    """
+
+    def __init__(self, lm: GPT2LMHeadModel) -> None:
+        super().__init__()
+        self.table = lm.get_input_embeddings()
+
+    def forward(self, ids: torch.Tensor) -> torch.Tensor:
+        return self.table(ids)
+
+
 def export(checkpoint: Path, out_dir: Path, hf_token: str | None) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -88,6 +103,17 @@ def export(checkpoint: Path, out_dir: Path, hf_token: str | None) -> None:
 
     vision_path = out_dir / "vision_projector.onnx"
     lm_path = out_dir / "lm_embeds.onnx"
+    embed_path = out_dir / "embed_tokens.onnx"
+
+    torch.onnx.export(
+        EmbedTokens(model.lm).eval(),
+        (torch.zeros(1, 2, dtype=torch.long),),
+        str(embed_path),
+        input_names=["ids"],
+        output_names=["embeds"],
+        dynamic_axes={"ids": {0: "batch", 1: "seq"}, "embeds": {0: "batch", 1: "seq"}},
+        opset_version=18,
+    )
 
     torch.onnx.export(
         vision_wrapper,
@@ -138,8 +164,12 @@ def export(checkpoint: Path, out_dir: Path, hf_token: str | None) -> None:
 
     image_diff = float(abs(pt_image.numpy() - onnx_image).max())
     logits_diff = float(abs(pt_logits.numpy() - onnx_logits).max())
+    embed_sess = ort.InferenceSession(str(embed_path), providers=["CPUExecutionProvider"])
+    onnx_embeds = embed_sess.run(None, {"ids": ids.numpy()})[0]
+    embed_diff = float(abs(embeds.numpy() - onnx_embeds).max())
     print(f"parzystość obrazu: max|Δ| = {image_diff:.2e}")
     print(f"parzystość logitów (S=30 vs eksport S=8): max|Δ| = {logits_diff:.2e}")
+    print(f"parzystość embeddów: max|Δ| = {embed_diff:.2e}")
 
     # --- kryterium produktowe: identyczne zdanie z dekodowania greedy ----
     # Różnice liczbowe rządu 1e-3 to szum fp32 przekształceń grafu; liczy się,
@@ -158,12 +188,15 @@ def export(checkpoint: Path, out_dir: Path, hf_token: str | None) -> None:
         return ids
 
     def greedy_onnx(image_embeds: np.ndarray, max_new: int = 24) -> list[int]:
-        emb_table = model.lm.get_input_embeddings()
         ids: list[int] = []
         for _ in range(max_new):
-            prefix = torch.tensor([ids], dtype=torch.long)
-            text = emb_table(prefix) if ids else torch.empty(1, 0, model.lm.config.n_embd)
-            embeds = np.concatenate([image_embeds, text.numpy()], axis=1)
+            if ids:
+                text = embed_sess.run(
+                    None, {"ids": np.array([ids], dtype=np.int64)}
+                )[0]
+            else:
+                text = np.zeros((1, 0, model.lm.config.n_embd), dtype=np.float32)
+            embeds = np.concatenate([image_embeds, text], axis=1)
             mask = np.ones((1, embeds.shape[1]), dtype=np.int64)
             logits = lm_sess.run(None, {"inputs_embeds": embeds, "attention_mask": mask})[0]
             next_id = int(logits[0, -1].argmax())
@@ -180,7 +213,7 @@ def export(checkpoint: Path, out_dir: Path, hf_token: str | None) -> None:
     print(f"dekodowanie greedy: {'ZGODNE' if same else 'NIEZGODNE'} — {text!r}")
     if not same:
         raise SystemExit(f"NIEZGODNE DEKODOWANIE: pt={pt_ids} onnx={onnx_ids}")
-    if image_diff > 5e-3 or logits_diff > 5e-3:
+    if image_diff > 5e-3 or logits_diff > 5e-3 or embed_diff > 5e-3:
         raise SystemExit("Różnice liczbowe ponad progiem fp32 — sprawdź graf")
 
     # --- mapa id → tekst (aplikacja tylko DEKODUJE, nie koduje) ---------
@@ -202,6 +235,7 @@ def export(checkpoint: Path, out_dir: Path, hf_token: str | None) -> None:
         "files": {
             "vision_projector": vision_path.name,
             "lm": lm_path.name,
+            "embed_tokens": embed_path.name,
             "tokens": "tokens_decoded.json",
         },
         "parity": {"image": image_diff, "logits": logits_diff},

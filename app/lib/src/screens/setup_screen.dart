@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 
 import '../prompts.dart';
 import '../services/gemma_service.dart';
+import '../services/model_router.dart';
+import '../services/slayer_service.dart';
 import '../services/tts_service.dart';
 import 'home_screen.dart';
 
@@ -71,6 +73,18 @@ class _SetupScreenState extends State<SetupScreen> {
     await _run(() => GemmaService.instance.installFromFile(path));
   }
 
+  /// Wczytuje własny model SLAYER (goLLeM w ONNX) z folderu zawierającego
+  /// `vision_projector.onnx`, `lm_embeds.onnx`, `embed_tokens.onnx`,
+  /// `tokens_decoded.json` (oraz `*.onnx.data`).
+  Future<void> _loadSlayer() async {
+    final dir = await FilePicker.getDirectoryPath();
+    if (dir == null) return;
+    await _run(() async {
+      await SlayerService.instance.loadFromDirectory(dir);
+      ModelRouter.engine = EngineKind.slayer;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final busy = _progress != null;
@@ -133,6 +147,22 @@ class _SetupScreenState extends State<SetupScreen> {
                 icon: const Icon(Icons.folder_open, size: 32),
                 label: const Text(
                   'Wybierz plik .litertlm',
+                  style: TextStyle(fontSize: 22),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Semantics(
+            button: true,
+            label: 'Wczytaj własny model SLAYER z folderu',
+            child: SizedBox(
+              height: 72,
+              child: OutlinedButton.icon(
+                onPressed: busy ? null : _loadSlayer,
+                icon: const Icon(Icons.science, size: 32),
+                label: const Text(
+                  'Model SLAYER (folder z ONNX)',
                   style: TextStyle(fontSize: 22),
                 ),
               ),
