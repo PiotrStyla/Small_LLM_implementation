@@ -23,13 +23,19 @@ from slayer_vision.scenes import SCENES
 
 
 def _split(records: list, eval_every: int = 5) -> tuple[list, list]:
-    """Co [eval_every]-ta próbka grupy → eval (grupy trzymamy razem w kolejności)."""
-    train, eval_ = [], []
-    counters: dict[str, int] = {}
+    """Podział per grupa (scena/typ syntetyki): co [eval_every]-ta próbka →
+    eval, a małe grupy (np. 4 zdjęcia) oddają ostatnią próbkę — inaczej
+    nie miałyby wcale reprezentacji w eval."""
+    groups: dict[str, list] = {}
     for record in records:
-        group = record["scene"]
-        counters[group] = counters.get(group, 0) + 1
-        (eval_ if counters[group] % eval_every == 0 else train).append(record)
+        groups.setdefault(record["scene"], []).append(record)
+    train, eval_ = [], []
+    for items in groups.values():
+        held = {index for index in range(len(items)) if (index + 1) % eval_every == 0}
+        if not held and len(items) >= 2:
+            held = {len(items) - 1}
+        for index, item in enumerate(items):
+            (eval_ if index in held else train).append(item)
     return train, eval_
 
 
