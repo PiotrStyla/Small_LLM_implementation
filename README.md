@@ -96,9 +96,15 @@ Dwa źródła próbek:
    list/pismo, metka z ceną. Zdanie generowane z tych samych slotów, które
    są rysowane (kwota, data, nazwa leku, położenie przycisku) — GT dokładne
    co do grosza, jak w syntezie PolOCRBench.
-2. **Zdjęcia** — wrzucaj do `slayer_vision/photos/<scene_id>/*.jpg`
-   (ścieżki scen = id z katalogu); builder przepisuje je do zbioru ze zdaniem
-   docelowym z katalogu. Lista scen bez zdjęć: `photos_missing.txt`.
+2. **Zdjęcia** — dwa źródła:
+   - **Wikimedia Commons (bez Twoich zdjęć!)** — `python -m slayer_vision.fetch_commons`
+     pobiera otwarte zdjęcia (CC0/PD/CC BY/CC BY-SA) i zapisuje atrybucję
+     w `photos/ATTRIBUTION.json`. Aktualnie: 692 zdjęć dla 178/200 scen.
+     Trafność weryfikujesz na `photos/REVIEW.html`
+     (`python -m slayer_vision.review`) — nietrafione pliki kasujesz ręcznie.
+   - **Własne** — wrzucaj do `slayer_vision/photos/<scene_id>/*.jpg`;
+     builder przepisuje je do zbioru ze zdaniem docelowym z katalogu.
+     Lista scen bez zdjęć: `photos_missing.txt`.
 
 ```bash
 python -m slayer_vision.build_dataset --out out/dataset --per-kind 40 --photos photos

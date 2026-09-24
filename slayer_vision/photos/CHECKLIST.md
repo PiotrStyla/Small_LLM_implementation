@@ -1,5 +1,10 @@
 # Zbiór zdjęć — 200 scen (protokół)
 
+> **Aktualizacja:** bazowe zdjęcia pobrane są już automatycznie z Wikimedia
+> Commons (692 plików, atrybucja w `ATTRIBUTION.json`, podgląd do recenzji w
+> `REVIEW.html`). Własne zdjęcia są nadal cenniejsze (realne warunki, znane
+> obiekty) — ten protokół obowiązuje przy ich robieniu.
+
 Każda scena z `slayer_vision/scenes.py` czeka na zdjęcia w `photos/<scene_id>/`.
 Builder sam tworzy brakujące katalogi — wystarczy raz uruchomić:
 
