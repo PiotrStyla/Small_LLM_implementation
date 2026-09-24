@@ -235,6 +235,25 @@ RENDERERS = {
 DIGIT_KINDS = ("rachunek", "data_waznosci", "cena", "list")
 
 
+CROP_PAD = 0.25  # margines wokół boksa slotu (w stosunku do rozmiaru boksa)
+
+
+def crop_slot(
+    image: Image.Image, box: tuple[int, int, int, int], pad: float = CROP_PAD
+) -> Image.Image:
+    """Zbliżenie wartości slotu (bbox + margines) → 224×224 (LANCZOS)."""
+    x0, y0, x1, y1 = box
+    w, h = x1 - x0, y1 - y0
+    px, py = int(w * pad) + 8, int(h * pad) + 8
+    region = (
+        max(0, x0 - px),
+        max(0, y0 - py),
+        min(image.width, x1 + px),
+        min(image.height, y1 + py),
+    )
+    return image.crop(region).resize((224, 224), Image.LANCZOS)
+
+
 def render_full(kind: str, seed: int):
     """Renderuje scenę [kind] dla [seed] → (obraz, zdanie, bbox-y slotów)."""
     if kind not in RENDERERS:

@@ -39,22 +39,37 @@ def _split(records: list, eval_every: int = 5) -> tuple[list, list]:
     return train, eval_
 
 
-def build(out_dir: Path, per_kind: int, photos_dir: Path | None, seed: int) -> None:
+def build(
+    out_dir: Path,
+    per_kind: int,
+    photos_dir: Path | None,
+    seed: int,
+    with_crops: bool = True,
+) -> None:
     images_dir = out_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
     records: list[dict] = []
 
-    # 1) Syntetyka z pełnym GT.
+    # 1) Syntetyka z pełnym GT (+ opcjonalnie widok 2: crop slotu — zbliżenie,
+    #    które uczy cyfr; pełny obraz uczy kontekstu sceny).
     for kind in synth.RENDERERS:
         for index in range(per_kind):
             kind_seed = rng.randrange(2**31)
-            image, sentence = synth.render(kind, kind_seed)
+            image, sentence, boxes = synth.render_full(kind, kind_seed)
             name = f"synth__{kind}__{index:04d}.png"
             image.save(images_dir / name)
             records.append(
                 {"image": name, "text": sentence, "scene": f"synth/{kind}"}
             )
+            if with_crops and kind in synth.DIGIT_KINDS:
+                slot_box = boxes.get("kwota") or boxes.get("data") or boxes.get("cena")
+                if slot_box is not None:
+                    crop_name = f"synth__{kind}__{index:04d}__crop.png"
+                    synth.crop_slot(image, slot_box).save(images_dir / crop_name)
+                    records.append(
+                        {"image": crop_name, "text": sentence, "scene": f"synth/{kind}"}
+                    )
 
     # 2) Zdjęcia użytkownika do katalogu scen.
     missing = []
@@ -104,12 +119,18 @@ def main() -> None:
     parser.add_argument("--per-kind", type=int, default=40, help="obrazów syntetycznych na typ")
     parser.add_argument("--photos", default="", help="katalog zdjęć photos/<scene_id>/*.jpg")
     parser.add_argument("--seed", type=int, default=42)
+    parser.add_argument(
+        "--no-crops",
+        action="store_true",
+        help="bez widoku 2 (cropów slotów) dla scen cyfrowych",
+    )
     args = parser.parse_args()
     build(
         Path(args.out),
         args.per_kind,
         Path(args.photos) if args.photos else None,
         args.seed,
+        with_crops=not args.no_crops,
     )
 
 
