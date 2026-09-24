@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'src/screens/home_screen.dart';
 import 'src/screens/setup_screen.dart';
 import 'src/services/gemma_service.dart';
+import 'src/services/model_router.dart';
+import 'src/services/slayer_service.dart';
 import 'src/services/tts_service.dart';
 import 'src/prompts.dart';
 
@@ -50,6 +52,13 @@ class _StartupGateState extends State<StartupGate> {
   }
 
   Future<void> _decide() async {
+    // 1) Własny model SLAYER z katalogu aplikacji (jeśli pliki wgrane).
+    if (await SlayerService.instance.tryAutoLoad()) {
+      ModelRouter.engine = EngineKind.slayer;
+      await TtsService.instance.speak(StatusTexts.modelReady);
+      return;
+    }
+    // 2) Gemma 3n zainstalowana wcześniej.
     if (!GemmaService.instance.hasModel) {
       await TtsService.instance.speak(StatusTexts.modelMissing);
       return;
@@ -68,7 +77,7 @@ class _StartupGateState extends State<StartupGate> {
             body: Center(child: CircularProgressIndicator()),
           );
         }
-        if (GemmaService.instance.isReady) {
+        if (GemmaService.instance.isReady || ModelRouter.slayerReady) {
           return const HomeScreen();
         }
         return const SetupScreen();

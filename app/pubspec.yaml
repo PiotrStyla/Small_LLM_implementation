@@ -19,6 +19,7 @@ dependencies:
   # Własny model SLAYER (goLLeM) w grafach ONNX + preprocessing obrazu.
   onnxruntime: ^1.4.1
   image: ^4.5.0
+  path_provider: ^2.1.4
 
 dev_dependencies:
   flutter_test:

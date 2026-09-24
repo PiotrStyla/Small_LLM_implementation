@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 import 'package:onnxruntime/onnxruntime.dart';
+import 'package:path_provider/path_provider.dart';
 
 /// SLAYER-Vision (goLLeM-110M-PL-SFT + SigLIP) w grafach ONNX — własny,
 /// polski model na urządzeniu, alternatywa dla Gemma 3n.
@@ -33,6 +34,27 @@ class SlayerService {
 
   bool get isReady =>
       _vision != null && _lm != null && _embed != null && _tokens.isNotEmpty;
+
+  /// Próbuje wczytać model z katalogu prywatnego aplikacji
+  /// (`.../Android/data/ai.slayer.vision_assistant/files/slayer-model/`) —
+  /// tam pliki wgrane przez `adb push` są czytelne bez SAF-owych ceregieli.
+  Future<bool> tryAutoLoad() async {
+    try {
+      final base = await getExternalStorageDirectory();
+      if (base == null) return false;
+      final dir = Directory(
+        '${base.path}${Platform.pathSeparator}slayer-model',
+      );
+      final marker = File(
+        '${dir.path}${Platform.pathSeparator}lm_embeds.onnx',
+      );
+      if (!await marker.exists()) return false;
+      await loadFromDirectory(dir.path);
+      return true;
+    } catch (_) {
+      return false; // auto-ładowanie jest tylko przyspieszeniem — błąd nie blokuje
+    }
+  }
 
   /// Wczytuje komplet plików modelu z katalogu.
   Future<void> loadFromDirectory(String dirPath) async {
