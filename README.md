@@ -5,7 +5,7 @@ to, co widać w kamerze — po polsku, głosem, w całości na urządzeniu (Andr
 i iOS), bez serwera inference i bez wysyłania zdjęć do internetu.
 
 ```
-kamera → klatka JPEG → Gemma 3n (lokalnie) → krótkie zdanie po polsku → TTS → 🔊
+kamera → klatka JPEG → SLAYER-Vision-PL lub Gemma 3n (lokalnie) → zdanie PL → TTS
 ```
 
 Projekt realizuje „przypadek 5" z analizy: mały model multimodalny na
@@ -30,19 +30,18 @@ Offline, Guided Vision jako punkty odniesienia).
 | Warstwa | Wybór | Dlaczego |
 |---|---|---|
 | App | Flutter (Android + iOS, jeden kod) | flutter_gemma jest natywnie multiplatformowy |
-| Model | **Gemma 3n E2B** (`.litertlm`, LiteRT-LM) | multimodalny (obraz+tekst), ~2 GB RAM, wizja na obu systemach |
-| Ingerencja | `flutter_gemma` + `flutter_gemma_litertlm` | jeden format `.litertlm` na Androida i iOS (15+) |
+| Model | **SLAYER-Vision-PL** (ONNX) lub Gemma 3n E2B (`.litertlm`) | własny mały model opisujący zdjęcia albo model ogólny odpowiadający na pytania |
+| Inference | `onnxruntime` lub `flutter_gemma` + `flutter_gemma_litertlm` | lokalnie na Androidzie i iOS |
 | TTS / ASR | `flutter_tts` / `speech_to_text` | systemowe — zero dodatkowych modeli, znajomy głos |
 | Kamera | `camera` | standard Fluttera |
 
-Alternatywa badawcza (osobny tor): **SLAYER-Vision-PL** — własny ultramały
-polski VLM (vision encoder ≈ 86M + projector 10–30M + goLLeM-110M-PL-SFT
-≈ 210–230M param.) na bazie modeli [SlayerLab](https://huggingface.co/SlayerLab).
+SLAYER-Vision-PL (SigLIP-base + projector + goLLeM-110M-PL-SFT) opisuje zdjęcie
+jednym zdaniem. Nie interpretuje pytania ani nie zastępuje OCR cyfr; pytania
+głosowe i presety mają pełne znaczenie tylko z Gemma 3n.
 
-## SLAYER-Vision-PL (tor badawczy)
+## SLAYER-Vision-PL
 
-Ultramały polski VLM na bazie własnych modeli SlayerLab — przyszły, w pełni
-własny model do tego samego produktu (obecny MVP używa Gemma 3n).
+Własny polski model do tego samego produktu, wytrenowany na katalogu scen:
 
 ```
 obraz 224×224 → SigLIP-base (zamrożony) → 196 tokenów → projector MLP
@@ -71,8 +70,8 @@ python -m slayer_vision.evaluate --checkpoint out/run-150 \
 
 ### Eksport on-device (ONNX)
 
-flutter_gemma obsługuje gotowe rodziny modeli — własną architekturę (SigLIP +
-projector + goLLeM) aplikacja składa sama z dwóch grafów ONNX:
+flutter_gemma nie obsługuje własnej architektury SigLIP + projector + goLLeM;
+aplikacja składa ją z trzech grafów ONNX:
 
 ```bash
 python -m slayer_vision.export_onnx --checkpoint out/run-final --out out/export-slayer-vision
@@ -82,17 +81,18 @@ python -m slayer_vision.export_onnx --checkpoint out/run-final --out out/export-
 |---|---|
 | `vision_projector.onnx` (+`.data`) | piksele → 196 tokenów obrazu (batch 1) |
 | `lm_embeds.onnx` (+`.data`) | embeddy + maska → logits; **sekwencja dynamiczna** |
+| `embed_tokens.onnx` (+`.data`) | id wygenerowanych tokenów → embeddy kolejnego kroku |
 | `tokens_decoded.json` | mapa id → tekst (aplikacja tylko dekoduje — format treningowy nie ma promptu/BOS) |
 | `manifest.json` | wymiary, pliki, wynik testu parzystości |
 
 Weryfikacja przy eksporcie: **test dekodowania greedy PyTorch ↔ ONNX** — musi
 wyjść identyczne zdanie (akceptacja produktowa; same różnice liczbowe fp32
-rzędu 1e-3 to szum przekształceń grafu). Eksporter ma dwa pułapki zapisane
-w kodzie: opset <18 psuje węzły `Split`, a `dynamo=False` pada na SDPA
-(transformers 4.57).
+rzędu 1e-3 to szum przekształceń grafu). Eksporter używa opsetu 18 (starszy
+psuje `Split`) i zapisuje IR 9 zgodny z mobilnym ONNX Runtime; IR 10 z domyślnego
+eksportu nie ładuje się na urządzeniu. Wszystkie pliki `*.onnx.data` muszą leżeć
+obok grafów.
 
-Grafy to ~800 MB fp32 (wagi w `*.onnx.data`) — na telefon kwantyzacja int8
-(`onnxruntime.quantization`) zwinie do ~200 MB.
+Grafy i wagi zajmują ~897 MB fp32. Kwantyzacja int8 nie jest jeszcze wdrożona.
 
 **Ewaluacja i odporność:** `evaluate.py` generuje zdanie do każdego obrazu
 z `eval.jsonl` (greedy, start z samych tokenów obrazu — format treningowy nie
@@ -170,16 +170,18 @@ flutter run
 
 ### Model (raz, potem offline)
 
-Aplikacja przy pierwszym uruchomieniu prosi o model **Gemma 3n E2B**
-(`google/gemma-3n-E2B-it-litert-lm`, ~2 GB):
+**SLAYER:** pobierz komplet ośmiu plików z
+[PiotrSty/slayer-vision-onnx](https://huggingface.co/PiotrSty/slayer-vision-onnx)
+(trzy `.onnx`, trzy `.onnx.data`, `tokens_decoded.json`, `manifest.json`).
+Na Androidzie skopiuj je do
+`/sdcard/Android/data/ai.slayer.vision_assistant/files/slayer-model/` (np. przez
+`adb push`) — aplikacja wczyta model przy następnym uruchomieniu. Alternatywnie
+wskaż folder przyciskiem „Model SLAYER (folder z ONNX)". Model nie wymaga tokenu.
 
-1. Zaakceptuj licencję modelu na Hugging Face i skopiuj token `hf_…`.
-2. Wklej token w ekranie konfiguracji i wybierz „Pobierz model".
-3. Alternatywnie: wrzuć plik `.litertlm` na telefon i wybierz
-   „Wybierz plik .litertlm" (udostępnianie plików w iOS jest włączone).
-
-Token jest potrzebny wyłącznie do pobrania — nie jest nigdzie zapisywany
-ani wysyłany dalej.
+**Gemma 3n E2B** (`google/gemma-3n-E2B-it-litert-lm`, ~2 GB):
+zaakceptuj licencję na Hugging Face, skopiuj token `hf_…`, wklej go na ekranie
+konfiguracji i wybierz „Pobierz model". Alternatywnie wskaż plik `.litertlm`.
+Token służy tylko do pobrania — aplikacja go nie zapisuje.
 
 ### Budowanie
 

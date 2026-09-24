@@ -26,6 +26,15 @@ class _SetupScreenState extends State<SetupScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    final autoError = SlayerService.instance.lastError;
+    if (autoError != null) {
+      _error = 'Diagnostyka: $autoError';
+    }
+  }
+
+  @override
   void dispose() {
     _repoController.dispose();
     _tokenController.dispose();

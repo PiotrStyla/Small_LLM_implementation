@@ -2,26 +2,25 @@
 
 flutter_gemma uruchamia gotowe rodziny modeli (Gemma/Qwen/…) — naszej własnej
 architektury (SigLIP + projector + goLLeM) nie obejmie. Dlatego eksportujemy
-DWA grafy ONNX, które aplikacja składa sama:
+TRZY grafy ONNX, które aplikacja składa sama:
 
 1. `vision_projector.onnx`: pixel_values (1,3,224,224) → embeddy obrazu
    (1,196,768) — zamrożony SigLIP + wytrenowany projekt; batch stały = 1,
    bo aplikacja przetwarza jedno zdjęcie na zapytanie;
 2. `lm_embeds.onnx`: inputs_embeds (B,S,768) + attention_mask → logits
    (B,S,32000) — scalony (merge LoRA) goLLeM-110M-PL-SFT; **S dynamiczne**,
-   bo dekodowanie greedy wydłuża sekwencję co krok.
+   bo dekodowanie greedy wydłuża sekwencję co krok;
+3. `embed_tokens.onnx`: id wygenerowanych tokenów → embeddy wejściowe LM.
 
 Format treningowy nie ma BOS ani promptu: generacja startuje z samych tokenów
 obrazu i dekoduje zdanie greedy. Dlatego aplikacja NIE potrzebuje tokenizera
 do kodowania — tylko mapy id → tekst (`tokens_decoded.json`), którą też tu
 zapisujemy.
 
-Wybór eksporterów (wnioski z boju):
-- vision: `torch.onnx.export` dynamo=True (legacy pada na SigLIP-ie:
-  `invalid unordered_map<K, T> key`); batch zaklepany na 1, bo dynamo piecze
-  kształty Reshape mimo `dynamic_axes`;
-- lm: dynamo=False (legacy) — GPT-2 eksportuje się nim poprawnie z dynamiczną
-  sekwencją; opset 18 (niższy wersjonuje węzły Split niepoprawnie).
+Eksporter PyTorch (dynamo=True) wymaga opsetu 18: starszy zapis psuje `Split`,
+a legacy exporter pada na SigLIP-ie. Batch wizji jest stały = 1, ponieważ
+dynamo zapieka kształty Reshape mimo `dynamic_axes`. Wersja IR jest obniżana
+do 9, aby grafy wczytywał ONNX Runtime dostarczany przez aplikację.
 
 Weryfikacja: test parzystości PyTorch ↔ ONNX, w tym LM przy sekwencji != niż
 eksportowa (dowód dynamiki).
@@ -35,6 +34,7 @@ import argparse
 import json
 from pathlib import Path
 
+import onnx
 import torch
 import torch.nn as nn
 from transformers import AutoTokenizer, GPT2LMHeadModel, SiglipVisionModel
@@ -139,6 +139,14 @@ def export(checkpoint: Path, out_dir: Path, hf_token: str | None) -> None:
         },
         opset_version=18,
     )
+    # ONNX Runtime dostarczany przez plugin mobilny obsługuje IR <= 9.
+    # PyTorch zapisuje IR 10 mimo braku cech wymagających tej wersji.
+    # Nie wczytuj zewnętrznych wag: zachowaj odwołania do *.onnx.data.
+    for path in (vision_path, lm_path, embed_path):
+        graph = onnx.load(str(path), load_external_data=False)
+        graph.ir_version = onnx.IR_VERSION_2023_5_5
+        onnx.save_model(graph, str(path))
+
 
     # --- test parzystości PyTorch ↔ ONNX ---------------------------------
     import numpy as np

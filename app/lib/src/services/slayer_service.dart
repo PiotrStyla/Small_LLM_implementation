@@ -32,27 +32,40 @@ class SlayerService {
   OrtSession? _embed;
   List<String> _tokens = const [];
 
+  /// Ostatni błąd auto-ładowania (diagnostyka widoczna w Setup).
+  String? lastError;
+
   bool get isReady =>
       _vision != null && _lm != null && _embed != null && _tokens.isNotEmpty;
 
   /// Próbuje wczytać model z katalogu prywatnego aplikacji
   /// (`.../Android/data/ai.slayer.vision_assistant/files/slayer-model/`) —
   /// tam pliki wgrane przez `adb push` są czytelne bez SAF-owych ceregieli.
+  ///
+  /// Przy błędzie zapisuje [lastError] (widoczny w Setup) — auto-ładowanie
+  /// nie blokuje aplikacji, ale diagnoza musi być widoczna.
   Future<bool> tryAutoLoad() async {
     try {
       final base = await getExternalStorageDirectory();
-      if (base == null) return false;
+      if (base == null) {
+        lastError = 'brak katalogu zewnętrznego aplikacji';
+        return false;
+      }
       final dir = Directory(
         '${base.path}${Platform.pathSeparator}slayer-model',
       );
       final marker = File(
         '${dir.path}${Platform.pathSeparator}lm_embeds.onnx',
       );
-      if (!await marker.exists()) return false;
+      if (!await marker.exists()) {
+        lastError = 'brak plików modelu w ${dir.path}';
+        return false;
+      }
       await loadFromDirectory(dir.path);
       return true;
-    } catch (_) {
-      return false; // auto-ładowanie jest tylko przyspieszeniem — błąd nie blokuje
+    } catch (e) {
+      lastError = 'auto-load: $e';
+      return false;
     }
   }
 
@@ -61,8 +74,10 @@ class SlayerService {
     OrtEnv.instance.init();
     final dir = Directory(dirPath);
     Future<OrtSession> session(String name) async {
-      final bytes = await File('${dir.path}${Platform.pathSeparator}$name').readAsBytes();
-      return OrtSession.fromBuffer(bytes, OrtSessionOptions());
+      // fromFile (nie fromBuffer!) — grafy trzymają wagi w zewnętrznych
+      // `*.onnx.data`; ORT rozwiązuje je dopiero przy wczytywaniu ze ścieżki.
+      final file = File('${dir.path}${Platform.pathSeparator}$name');
+      return OrtSession.fromFile(file, OrtSessionOptions());
     }
 
     final tokensFile = File('${dir.path}${Platform.pathSeparator}tokens_decoded.json');
@@ -166,7 +181,7 @@ class SlayerService {
         'inputs_embeds':
             OrtValueTensor.createTensorWithDataList(embeds, [1, seq, hidden]),
         'attention_mask': OrtValueTensor.createTensorWithDataList(
-          Int64List(seq),
+          Int64List(seq)..fillRange(0, seq, 1),
           [1, seq],
         ),
       });
