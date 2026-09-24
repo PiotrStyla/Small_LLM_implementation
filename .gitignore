@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 out/
+
+# lokalne artefakty Gradle spoza glownego build/
+app/android/build/
+app/ios/build/
