@@ -69,6 +69,31 @@ python -m slayer_vision.evaluate --checkpoint out/run-150 \
     --data-jsonl out/dataset/eval.jsonl --image-root out/dataset/images
 ```
 
+### Eksport on-device (ONNX)
+
+flutter_gemma obsługuje gotowe rodziny modeli — własną architekturę (SigLIP +
+projector + goLLeM) aplikacja składa sama z dwóch grafów ONNX:
+
+```bash
+python -m slayer_vision.export_onnx --checkpoint out/run-final --out out/export-slayer-vision
+```
+
+| Plik | Rola |
+|---|---|
+| `vision_projector.onnx` (+`.data`) | piksele → 196 tokenów obrazu (batch 1) |
+| `lm_embeds.onnx` (+`.data`) | embeddy + maska → logits; **sekwencja dynamiczna** |
+| `tokens_decoded.json` | mapa id → tekst (aplikacja tylko dekoduje — format treningowy nie ma promptu/BOS) |
+| `manifest.json` | wymiary, pliki, wynik testu parzystości |
+
+Weryfikacja przy eksporcie: **test dekodowania greedy PyTorch ↔ ONNX** — musi
+wyjść identyczne zdanie (akceptacja produktowa; same różnice liczbowe fp32
+rzędu 1e-3 to szum przekształceń grafu). Eksporter ma dwa pułapki zapisane
+w kodzie: opset <18 psuje węzły `Split`, a `dynamo=False` pada na SDPA
+(transformers 4.57).
+
+Grafy to ~800 MB fp32 (wagi w `*.onnx.data`) — na telefon kwantyzacja int8
+(`onnxruntime.quantization`) zwinie do ~200 MB.
+
 **Ewaluacja i odporność:** `evaluate.py` generuje zdanie do każdego obrazu
 z `eval.jsonl` (greedy, start z samych tokenów obrazu — format treningowy nie
 ma BOS) i liczy trafienie dokładne po normalizacji + F1 tokenów. Flaga
