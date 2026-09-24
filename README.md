@@ -1,16 +1,16 @@
 # Small LLM implementation — Asystent wzrokowy (on-device)
 
-Asystent dla osób niewidomych i seniorów: **pokaż i zapytaj**. Telefon opisuje
-to, co widać w kamerze — po polsku, głosem, w całości na urządzeniu (Android
-i iOS), bez serwera inference i bez wysyłania zdjęć do internetu.
+Eksperymentalny asystent wzrokowy dla osób niewidomych i seniorów. Aparat
+rejestruje zdjęcie, a telefon pokazuje i wypowiada po polsku opis lub odczytany
+tekst. **Nie jest to bezpieczny zamiennik samodzielnej oceny otoczenia**:
+model myli przedmioty, OCR myli cyfry, a aplikacja bywa zamykana przy braku
+pamięci. Nie używać jej jako jedynego źródła decyzji o ruchu, lekach,
+terminach ważności ani płatnościach.
 
 ```
-kamera → klatka JPEG → SLAYER-Vision-PL lub Gemma 3n (lokalnie) → zdanie PL → TTS
+opis: zdjęcie → SigLIP → projector → mały polski LLM goLLeM → podpis → TTS
+tekst/data/kwota: zdjęcie → lokalny OCR ML Kit → ostrożny odczyt → TTS
 ```
-
-Projekt realizuje „przypadek 5" z analizy: mały model multimodalny na
-urządzeniu jako osobisty asystent świata fizycznego (Gemma Vision, Vite Vere
-Offline, Guided Vision jako punkty odniesienia).
 
 ## Możliwości (MVP)
 
@@ -24,11 +24,13 @@ Offline, Guided Vision jako punkty odniesienia).
   nie rozpoznaje samej ikony ani nie wskazuje położenia przycisku.
 - **Pytania głosem** (systemowy ASR, polski); w trybie SLAYER obsługiwane są
   wyłącznie rozpoznane polecenia z powyższego katalogu.
-- 🔊 **Odpowiedź głosowa** (systemowy TTS — ten sam głos/tempo, którego
-  użytkownik używa w czytniku ekranu) + duży, czytelny tekst.
-- 📴 **Offline po pobraniu modelu** — obrazy nie opuszczają urządzenia.
-- ♿ **Dostępność**: pełne etykiety Semantics dla TalkBack/VoiceOver,
-  przyciski min. 72 dp, sterowanie jedną ręką.
+- **Odpowiedź głosowa** przez systemowy TTS + duży tekst (odsłuch na telefonie
+  niezweryfikowany); rozpoznawanie pytań głosowych korzysta z systemowego ASR.
+- **Offline dla obrazu, OCR i generacji SLAYER** po instalacji plików modelu;
+  zdjęcia nie są wysyłane przez aplikację. Systemowe ASR może wymagać sieci
+  lub przetwarzać głos przez usługę systemową — nie gwarantujemy offline ASR.
+- Etykiety dostępności Semantics dla TalkBack/VoiceOver i duże przyciski;
+  użyteczność z użytkownikami niewidomymi nie została przetestowana.
 
 ## Stack
 
@@ -49,12 +51,23 @@ wymagają Gemma 3n.
 
 ## SLAYER-Vision-PL
 
-Własny polski model do tego samego produktu, wytrenowany na katalogu scen:
+**Mały LLM ma konkretną rolę:** `SlayerLab/goLLeM-110M-PL-SFT-merged` to
+polski decoder-only GPT-2 (~110 mln parametrów, 12 warstw, kontekst 512).
+Nie ogląda pikseli bezpośrednio. Zamrożony SigLIP-base (~86 mln parametrów)
+przekształca zdjęcie 224×224 w 196 wektorów; trenowany projector (~3,15 mln)
+rzutuje je do przestrzeni goLLeM. Dostrojenie LoRA (~0,59 mln) scalono
+z modelem językowym przy eksporcie; łącznie ~206,6 mln parametrów.
 
 ```
-obraz 224×224 → SigLIP-base (zamrożony) → 196 tokenów → projector MLP
-→ tokeny obrazu + tokeny tekstu → goLLeM-110M-PL-SFT (LoRA) → zdanie PL
+obraz 224×224 → SigLIP-base → 196 wektorów → projector
+→ wejście goLLeM-110M-PL-SFT (+ scalona LoRA) → podpis obrazu po polsku
 ```
+
+Model trenowano do **podpisywania zdjęć**, bez promptu tekstowego i BOS.
+Generacja zaczyna się od wektorów obrazu. Naciśnięcie „Co jest przede mną?”
+lub „Co to jest?” wywołuje ten sam rodzaj podpisu: LLM **nie otrzymuje treści
+pytania**. Pozostałe przyciski przełączają na OCR, a nie na rozumienie poleceń
+przez LLM. To nie jest VQA ani ogólna rozmowa o obrazie.
 
 | Metryka | Wartość |
 |---|---|
@@ -165,49 +178,80 @@ app/                      # aplikacja Flutter (android + ios)
         stt_service.dart  # rozpoznawanie mowy pl-PL
 ```
 
-## Uruchomienie
+## Instalacja na Androidzie
 
-Wymagania: Flutter **≥ 3.44** (sprawdzone na 3.47.5), Android arm64 lub
-iOS 15.5+ (wymóg ML Kit).
+**Pliki do pobrania:** [GitHub Releases — v0.1.0-ocr](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.1.0-ocr):
 
-```bash
-cd app
-flutter pub get
-flutter run
+| Plik | Rozmiar | Zawartość |
+|---|---:|---|
+| `Asystent-wzrokowy.apk` | 224 431 594 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**, nie do Google Play |
+| `SLAYER-Vision-ONNX-IR9.zip` | 832 049 622 B (~794 MiB) | folder `slayer-model/` z ośmioma plikami modelu (~897 MB po rozpakowaniu) i `MODEL-ATTRIBUTION.txt` |
+
+Suma SHA-256 APK: `ca5d6daabb1b2b2829de25c6b8849dabd2a370ff5d600bc8b864b70779815797`  
+Suma SHA-256 ZIP: `3b1570ac4956ca0ca0e7b9150283462ee467d6d8265e39673b895f7f5e199592`
+
+**Wymagania:** Android arm64, kilka GB wolnej pamięci wewnętrznej i dużo RAM;
+telefon Samsung SM-A226B przy próbach zgłaszał zamknięcia `LOW_MEMORY`.
+Na komputerze: [Android Platform Tools (ADB)](https://developer.android.com/tools/releases/platform-tools),
+na telefonie włączone debugowanie USB i zaakceptowane uprawnienie ADB.
+Pobierz **oba** pliki do tego samego folderu. W PowerShell uruchom:
+
+```powershell
+Get-FileHash .\Asystent-wzrokowy.apk -Algorithm SHA256
+Get-FileHash .\SLAYER-Vision-ONNX-IR9.zip -Algorithm SHA256
+adb devices
+adb install -r .\Asystent-wzrokowy.apk
+Expand-Archive .\SLAYER-Vision-ONNX-IR9.zip -DestinationPath .
+adb shell mkdir -p /sdcard/Android/data/ai.slayer.vision_assistant/files/slayer-model
+adb push slayer-model/. /sdcard/Android/data/ai.slayer.vision_assistant/files/slayer-model/
+adb shell am force-stop ai.slayer.vision_assistant
+adb shell am start -n ai.slayer.vision_assistant/.MainActivity
 ```
 
-### Model (raz, potem offline)
+`adb devices` musi pokazać telefon jako `device`, nie `unauthorized`.
+Sprawdź sumy z tabelą przed instalacją. Pliki `.onnx.data` muszą leżeć **obok**
+odpowiadających im `.onnx`; nie uruchamiaj ONNX bez całego folderu. Po
+uruchomieniu aplikacja szuka katalogu `slayer-model` i wybiera SLAYER, jeśli
+jest obecny. Gdy widzisz ekran konfiguracji, sprawdź pliki przez
+`adb shell ls /sdcard/Android/data/ai.slayer.vision_assistant/files/slayer-model`.
+Model można też pobrać z [Hugging Face](https://huggingface.co/PiotrSty/slayer-vision-onnx)
+(te same osiem wymaganych plików, bez tokenu). Wskazanie folderu przez
+systemowy picker Androida nie zostało zweryfikowane; ADB to sprawdzona ścieżka.
 
-**SLAYER:** pobierz komplet ośmiu plików z
-[PiotrSty/slayer-vision-onnx](https://huggingface.co/PiotrSty/slayer-vision-onnx)
-(trzy `.onnx`, trzy `.onnx.data`, `tokens_decoded.json`, `manifest.json`).
-Na Androidzie skopiuj je do
-`/sdcard/Android/data/ai.slayer.vision_assistant/files/slayer-model/` (np. przez
-`adb push`) — aplikacja wczyta model przy następnym uruchomieniu. Alternatywnie
-wskaż folder przyciskiem „Model SLAYER (folder z ONNX)". Model nie wymaga tokenu.
+**Bez komputera:** samo APK zainstaluje aplikację, ale podpisy zdjęć SLAYER
+nie działają bez osobnego modelu. Na ekranie konfiguracji można zamiast
+SLAYER wybrać Gemma 3n E2B (`google/gemma-3n-E2B-it-litert-lm`, ~2 GB):
+zaakceptuj licencję na Hugging Face i podaj własny token `hf_…` do pobrania
+lub wskaż posiadany plik `.litertlm`. Jeśli folder SLAYER jest zainstalowany,
+ma pierwszeństwo przy starcie. Gemma na tym Samsungu nie była zweryfikowana.
 
-**Gemma 3n E2B** (`google/gemma-3n-E2B-it-litert-lm`, ~2 GB):
-zaakceptuj licencję na Hugging Face, skopiuj token `hf_…`, wklej go na ekranie
-konfiguracji i wybierz „Pobierz model". Alternatywnie wskaż plik `.litertlm`.
-Token służy tylko do pobrania — aplikacja go nie zapisuje.
+### Budowanie ze źródeł
 
-### Budowanie
+Flutter ≥ 3.44 (lokalnie 3.47.5). `cd app`, `flutter pub get`,
+`flutter build apk --release`. APK release jest na razie podpisywany kluczem
+debugowym; przed publicznym sklepem trzeba go zastąpić kluczem wydawcy.
+Wersja iOS wymaga iOS 15.5+, macOS/Xcode i podpisania aplikacji; **IPA nie
+zostało zbudowane ani przetestowane**. W tym wydaniu pliki instalacyjne są
+wyłącznie dla Androida.
 
-```bash
-flutter build apk --release        # Android (tylko arm64-v8a)
-flutter build ipa --release        # iOS (wymaga macOS + certyfikatów)
-```
+## Rzeczywiste niedomagania i wyniki prób
 
-## Ograniczenia MVP
+| Obszar | Zaobserwowano / granica możliwości |
+|---|---|
+| Podpis zdjęcia | Ewaluacja na 319 przykładach z zamkniętego katalogu scen: **114/319 (35,7%) exact**, F1 tokenów 0,700. To nie jest skuteczność na ulicy. Na żywo rozpoznano kubek i mysz, ale sok nazwano „butelką soli”, zegar „odkurzaczem” (zdjęcie rozmyte), obraz „szafką nocną”. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
+| Polecenia | SLAYER nie jest VQA i nie potrafi rozumieć swobodnych pytań. „Co jest przede mną?”/„Co to jest?” to ten sam podpis zdjęcia. Tekst/data/kwota idą przez osobny OCR. „Który przycisk?” identyfikuje wyłącznie czytelny napis zasilania; nie wskazuje położenia ani ikony. |
+| OCR | ML Kit Latin działa w release na Samsungu, lecz odręczny numer `12-266-85-28` odczytał jako `R-G6-8S-28`. Reguły dat/rachunków ograniczają zgadywanie, lecz nie naprawiają błędnie odczytanej cyfry. Bez etykiety terminu/kwoty aplikacja odmawia odpowiedzi. **Nie używać samego OCR do decyzji o leku, terminie lub zapłacie.** |
+| Pamięć | Trzy grafy fp32 to ~897 MB na dysku; sesje ONNX na Samsungu osiągały ~0,9–1,1 GB PSS i system zapisał kilka zamknięć `LOW_MEMORY`. Nie ma kwantyzacji ani odciążenia sesji po podpisie. Stabilność długotrwała i działanie na słabszych urządzeniach nie są potwierdzone. |
+| Głos / platformy | TTS jest wywoływane w kodzie, lecz fizyczny odsłuch nie został potwierdzony. Systemowy ASR może potrzebować sieci; przy pytaniu poza katalogiem SLAYER odmawia. iOS/IPA i obsługa z czytnikiem ekranu nie były testowane. |
 
-- SLAYER (~897 MB) generuje podpis obrazu, nie odpowiedź na swobodne pytanie;
-  wynik jest niepewny i może być błędny. Nie polegać na nim w kwestiach
-  bezpieczeństwa, leków czy orientacji bez dodatkowej weryfikacji.
-- OCR wymaga ostrego ujęcia czytelnej etykiety/dat/kwoty; po braku danych
-  prosi o ponowne zdjęcie. Wskazanie przycisku po samej ikonie nie działa.
-- Gemma 3n (~2 GB) wymaga licencji i pobrania; `.litertlm` na Androidzie
-  wymaga `arm64-v8a` (zawężone w `build.gradle.kts`).
+Ta wersja jest **prototypem badawczym, nie narzędziem bezpieczeństwa**.
 
-## Licencja
+## Licencje
 
-MIT (patrz `LICENSE`).
+Kod aplikacji: MIT (`LICENSE`). **Wagi modelu są osobnym utworem**:
+baza językowa goLLeM (Arkadiusz Słota / SlayerLab) —
+[CC-BY-SA-4.0](https://huggingface.co/SlayerLab/goLLeM-110M-PL-SFT-merged);
+enkoder SigLIP Google —
+[Apache-2.0](https://huggingface.co/google/siglip-base-patch16-224).
+Archiwum modelu podaje autorów, pochodzenie i zmiany w
+`MODEL-ATTRIBUTION.txt`. Licencja MIT repozytorium **nie obejmuje** wag.
