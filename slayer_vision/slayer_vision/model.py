@@ -52,7 +52,9 @@ class SlayerVisionModel(nn.Module):
             # żeby nie transponować macierzy A/B.
             fan_in_fan_out=True,
         )
-        self.lm: PeftModel = get_peft_model(lm, lora)
+        # Ewaluacja podaje LM już z wczytanymi adapterami (PeftModel) —
+        # wtedy nie zakładamy nowych. Trening podaje surowy GPT2LMHeadModel.
+        self.lm: PeftModel = lm if isinstance(lm, PeftModel) else get_peft_model(lm, lora)
 
         self.image_tokens = IMAGE_TOKENS
         if self.image_tokens + 2 > lm.config.n_positions:

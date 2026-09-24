@@ -70,6 +70,7 @@ def train(config: TrainConfig) -> None:
         tokenizer,
         image_root=config.image_root,
         max_text_tokens=config.max_text_tokens,
+        augment=config.augment,
     )
     loader = DataLoader(
         dataset,
@@ -123,6 +124,11 @@ def main() -> None:
     parser.add_argument("--steps", type=int, default=TrainConfig.steps)
     parser.add_argument("--batch-size", type=int, default=TrainConfig.batch_size)
     parser.add_argument("--max-text-tokens", type=int, default=TrainConfig.max_text_tokens)
+    parser.add_argument(
+        "--augment",
+        action="store_true",
+        help="degradacje obrazu w treningu (jasność/szum/rozmycie/obrót/kwantyzacja)",
+    )
     parser.add_argument("--lr-projector", type=float, default=TrainConfig.lr_projector)
     parser.add_argument("--lr-lora", type=float, default=TrainConfig.lr_lora)
     parser.add_argument("--lora-r", type=int, default=TrainConfig.lora_r)
@@ -140,6 +146,7 @@ def main() -> None:
             steps=args.steps,
             batch_size=args.batch_size,
             max_text_tokens=args.max_text_tokens,
+            augment=args.augment,
             lr_projector=args.lr_projector,
             lr_lora=args.lr_lora,
             lora_r=args.lora_r,

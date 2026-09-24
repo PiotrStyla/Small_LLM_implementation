@@ -56,7 +56,8 @@ def build(out_dir: Path, per_kind: int, photos_dir: Path | None, seed: int) -> N
     if photos_dir and photos_dir.exists():
         for scene in SCENES:
             scene_dir = photos_dir / scene.id
-            photos = sorted(scene_dir.glob("*.jpg")) if scene_dir.exists() else []
+            scene_dir.mkdir(parents=True, exist_ok=True)  # katalog na zdjęcia
+            photos = sorted(scene_dir.glob("*.jpg"))
             if not photos:
                 missing.append(scene.id)
                 continue

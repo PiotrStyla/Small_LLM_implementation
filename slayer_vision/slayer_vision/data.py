@@ -33,10 +33,12 @@ class CaptionDataset(Dataset):
         tokenizer,
         image_root: str = "",
         max_text_tokens: int = 96,
+        augment: bool = False,
     ) -> None:
         self.image_root = Path(image_root) if image_root else None
         self.tokenizer = tokenizer
         self.max_text_tokens = max_text_tokens
+        self.augment = augment
         self.samples = []
         with open(jsonl_path, encoding="utf-8") as handle:
             for line_number, line in enumerate(handle, start=1):
@@ -60,6 +62,10 @@ class CaptionDataset(Dataset):
     def __getitem__(self, index: int) -> dict:
         record = self.samples[index]
         pixel_values = load_image_tensor(self._resolve(record["image"]))
+        if self.augment:
+            from slayer_vision.augment import degrade
+
+            pixel_values = degrade(pixel_values)
         ids = self.tokenizer(
             record["text"],
             truncation=True,

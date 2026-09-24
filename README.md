@@ -64,8 +64,18 @@ cd slayer_vision
 python smoke_test.py                                  # forward/backward w realnych wymiarach
 python -m slayer_vision.build_dataset --out out/dataset --per-kind 40 --photos photos
 python -m slayer_vision.train --data-jsonl out/dataset/train.jsonl \
-    --image-root out/dataset/images --steps 1000 --batch-size 4
+    --image-root out/dataset/images --steps 1000 --batch-size 4 --augment
+python -m slayer_vision.evaluate --checkpoint out/run-150 \
+    --data-jsonl out/dataset/eval.jsonl --image-root out/dataset/images
 ```
+
+**Ewaluacja i odporność:** `evaluate.py` generuje zdanie do każdego obrazu
+z `eval.jsonl` (greedy, start z samych tokenów obrazu — format treningowy nie
+ma BOS) i liczy trafienie dokładne po normalizacji + F1 tokenów. Flaga
+`--degrade` powtarza pomiar na zdegradowanych obrazach (deterministycznie per
+próbka) — różnica to miara odporności na warunki zdjęcia. W treningu `--augment`
+dokłada losowe degradacje (`augment.py`: jasność, kontrast, rozmycie, szum,
+obrót ±6°, kwantyzacja zamiennikiem JPEG).
 
 Zapis checkpointu: `projector.pt` + adaptery LoRA (`lora/`) + manifest
 `slayer_vision.json` — do dołożenia w aplikacji zamiast Gemma 3n, gdy tor

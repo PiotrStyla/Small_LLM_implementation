@@ -29,6 +29,7 @@ class TrainConfig:
     steps: int = 1000
     batch_size: int = 4
     max_text_tokens: int = 96
+    augment: bool = False
     lr_projector: float = 1e-3
     lr_lora: float = 2e-4
     lora_r: int = 16
