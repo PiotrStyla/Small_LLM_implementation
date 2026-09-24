@@ -62,18 +62,42 @@ Kod: `slayer_vision/` — `model.py` (okablowanie), `data.py` (dataset),
 ```bash
 cd slayer_vision
 python smoke_test.py                                  # forward/backward w realnych wymiarach
-python -m slayer_vision.train --data-jsonl data/captions.jsonl --image-root data/images
+python -m slayer_vision.build_dataset --out out/dataset --per-kind 40 --photos photos
+python -m slayer_vision.train --data-jsonl out/dataset/train.jsonl \
+    --image-root out/dataset/images --steps 1000 --batch-size 4
 ```
 
 Zapis checkpointu: `projector.pt` + adaptery LoRA (`lora/`) + manifest
 `slayer_vision.json` — do dołożenia w aplikacji zamiast Gemma 3n, gdy tor
 treningowy domknie jakość.
 
-**Plan danych:** specjalizowany, zamknięty katalog ~200 typów scen
-(zdjęcie → jedno zdanie) — 110M model halucynuje w otwartym „opisz świat",
-więc uczymy wąskiego zachowania produktowego. Źródła: synteza dokumentów
-z PolOCRBench/OCR_engine (sceny „przeczytaj list/rachunek"), zdjęcia
-przedmiotów codziennych i opakowań.
+### Zbiór danych (katalog 200 scen)
+
+Zamknięty katalog w `slayer_vision/scenes.py` — **200 scen** w 10 kategoriach
+(opakowania, leki, AGD/panele, piloty, dokumenty, zakupy, ulica, dom,
+przesyłki, przedmioty codzienne). Zamknięcie katalogu jest świadomym
+kompromisem: 110M model halucynuje w otwartym „opisz świat", a użytkownik
+potrzebuje przewidywalnych, jednozdaniowych odpowiedzi.
+
+Dwa źródła próbek:
+
+1. **Syntetyka z pełnym GT** (`synth.py`) — 7 rendererów PIL: rachunek/paragon,
+   etykieta z datą ważności, blister leków, panel AGD z przyciskami, pilot,
+   list/pismo, metka z ceną. Zdanie generowane z tych samych slotów, które
+   są rysowane (kwota, data, nazwa leku, położenie przycisku) — GT dokładne
+   co do grosza, jak w syntezie PolOCRBench.
+2. **Zdjęcia** — wrzucaj do `slayer_vision/photos/<scene_id>/*.jpg`
+   (ścieżki scen = id z katalogu); builder przepisuje je do zbioru ze zdaniem
+   docelowym z katalogu. Lista scen bez zdjęć: `photos_missing.txt`.
+
+```bash
+python -m slayer_vision.build_dataset --out out/dataset --per-kind 40 --photos photos
+```
+
+Podział train/eval: co piąta próbka grupy → eval (nowe ujęcia tych samych
+scen, nie nowe kategorie). Obecnie wygenerowane: 280 próbek syntetycznych
+(224/56). Weryfikacja formatu: `CaptionDataset` + `collate` (padding maskowany
+przez -100).
 
 ## Struktura
 
