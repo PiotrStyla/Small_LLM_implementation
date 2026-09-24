@@ -34,21 +34,52 @@ def build_model(config: TrainConfig) -> tuple[SlayerVisionModel, AutoTokenizer]:
         tokenizer.pad_token = tokenizer.eos_token
 
     vision = SiglipVisionModel.from_pretrained(SIGLIP_REPO, token=config.hf_token)
-    lm = GPT2LMHeadModel.from_pretrained(GOLLEM_REPO, token=config.hf_token)
-    model = SlayerVisionModel(
-        vision=vision,
-        lm=lm,
-        lora_r=config.lora_r,
-        lora_alpha=config.lora_alpha,
-    )
+    base_lm = GPT2LMHeadModel.from_pretrained(GOLLEM_REPO, token=config.hf_token)
+
+    if config.resume_from:
+        # Wznowienie: adaptery LoRA i project z poprzedniego biegu; base LM
+        # i vision z repo (zamrożone/vażone identycznie).
+        from peft import PeftModel
+
+        lm = PeftModel.from_pretrained(
+            base_lm, Path(config.resume_from) / "lora", is_trainable=True
+        )
+        model = SlayerVisionModel(vision=vision, lm=lm)
+        model.projector.load_state_dict(
+            torch.load(
+                Path(config.resume_from) / "projector.pt",
+                map_location="cpu",
+                weights_only=True,
+            )
+        )
+    else:
+        model = SlayerVisionModel(
+            vision=vision,
+            lm=base_lm,
+            lora_r=config.lora_r,
+            lora_alpha=config.lora_alpha,
+        )
     return model, tokenizer
 
 
-def save_checkpoint(model: SlayerVisionModel, tokenizer, output_dir: Path) -> None:
+def save_checkpoint(
+    model: SlayerVisionModel,
+    tokenizer,
+    output_dir: Path,
+    optimizer: torch.optim.Optimizer | None = None,
+    step: int = 0,
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     torch.save(model.projector.state_dict(), output_dir / "projector.pt")
     model.lm.save_pretrained(output_dir / "lora")
     tokenizer.save_pretrained(output_dir / "tokenizer")
+    if optimizer is not None:
+        # Stan optymalizatora + numer kroku — `--resume-from` kontynuuje bieg
+        # w kolejnym oknie czasowym (job na CPU ma limit ~1 h).
+        torch.save(
+            {"step": step, "optimizer": optimizer.state_dict()},
+            output_dir / "training_state.pt",
+        )
     manifest = {
         "base_lm": GOLLEM_REPO,
         "vision_encoder": SIGLIP_REPO,
@@ -94,6 +125,13 @@ def train(config: TrainConfig) -> None:
     model.train()
     model.vision.eval()
     step, running = 0, 0.0
+    if config.resume_from:
+        state_path = Path(config.resume_from) / "training_state.pt"
+        if state_path.exists():
+            state = torch.load(state_path, map_location="cpu", weights_only=True)
+            optimizer.load_state_dict(state["optimizer"])
+            step = state["step"]
+            print(f"Wznowienie od kroku {step} z {config.resume_from}")
     output_dir = Path(config.output_dir)
     while step < config.steps:
         for batch in loader:
@@ -112,8 +150,8 @@ def train(config: TrainConfig) -> None:
                 print(f"krok {step}/{config.steps}  loss {running / config.log_every:.4f}")
                 running = 0.0
             if step % config.save_every == 0 or step == config.steps:
-                save_checkpoint(model, tokenizer, output_dir)
-                print(f"Zapisano checkpoint: {output_dir}")
+                save_checkpoint(model, tokenizer, output_dir, optimizer, step)
+                print(f"Zapisano checkpoint: {output_dir} (krok {step})")
 
 
 def main() -> None:
@@ -136,6 +174,11 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=TrainConfig.seed)
     parser.add_argument("--save-every", type=int, default=TrainConfig.save_every)
     parser.add_argument("--hf-token", default=None)
+    parser.add_argument(
+        "--resume-from",
+        default=None,
+        help="katalog poprzedniego biegu — kontynuuje od zapisanego kroku",
+    )
     args = parser.parse_args()
 
     train(
@@ -154,6 +197,7 @@ def main() -> None:
             seed=args.seed,
             save_every=args.save_every,
             hf_token=args.hf_token,
+            resume_from=args.resume_from,
         )
     )
 

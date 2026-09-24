@@ -37,6 +37,9 @@ class TrainConfig:
     weight_decay: float = 0.0
     grad_clip: float = 1.0
     seed: int = 42
+    # Wznawianie treningu (kolejne okno 1 h na CPU): katalog z poprzedniego
+    # biegu zawiera adaptery, projector i `training_state.pt`.
+    resume_from: str | None = None
     log_every: int = 10
     save_every: int = 250
     hf_token: str | None = None

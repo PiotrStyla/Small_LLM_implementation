@@ -52,9 +52,49 @@ def _api(params: dict) -> dict:
     raise RuntimeError("unreachable")
 
 
+# Sceny, przy których polskie zapytania nie dały wyników — angielskie hasła.
+ENGLISH_QUERIES = {
+    "leki/bateria-aparat-sluchowy": "hearing aid battery",
+    "leki/pampersy": "adult diaper package",
+    "leki/chusteczki": "tissue box",
+    "agd/pralka-panel": "washing machine control panel",
+    "agd/pralka-szuflada": "washing machine detergent drawer",
+    "agd/zmywarka-panel": "dishwasher control panel",
+    "agd/zmywarka-koszyk": "dishwasher rack",
+    "agd/piekarnik-panel": "oven control panel",
+    "agd/mikrofalowka-panel": "microwave control panel",
+    "agd/lodowka-termostat": "refrigerator temperature dial",
+    "agd/prysznic-bateria": "shower mixer tap",
+    "agd/zlew-kurek": "kitchen sink faucet",
+    "agd/termostat-pokojowy": "room thermostat",
+    "agd/domofon": "door entry phone",
+    "agd/wideodomofon": "video door phone",
+    "dokumenty/rachunek-prad": "electricity bill",
+    "dokumenty/rachunek-gaz": "gas bill",
+    "dokumenty/rachunek-woda": "water bill",
+    "dokumenty/ksiazeczka-zdrowia": "health record book",
+    "zakupy/cena-polka": "price tag shelf",
+    "zakupy/karta-lojalnosciowa": "loyalty card",
+    "dom/szafa-uchwyt": "wardrobe handle",
+    "dom/kosz-pranie": "laundry basket",
+    "przesylki/torba-prezentowa": "gift bag",
+    "piloty/telefon-klawiszowy": "feature phone keypad",
+    "dokumenty/wynik-badania": "medical test report",
+    "zakupy/waga-sklepowa": "shop scale",
+    "dom/okno-klamka": "window handle",
+    "przesylki/etykieta-adresowa": "address label",
+}
+
+
 def _queries(name: str, scene_id: str) -> list[str]:
     fallback = scene_id.split("/")[-1].replace("-", " ")
-    return [name, fallback] if fallback != name else [name]
+    queries = [name]
+    english = ENGLISH_QUERIES.get(scene_id)
+    if english:
+        queries.append(english)
+    if fallback != name:
+        queries.append(fallback)
+    return queries
 
 
 def _license_ok(extmeta: dict) -> str | None:
