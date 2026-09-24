@@ -39,6 +39,42 @@ Alternatywa badawcza (osobny tor): **SLAYER-Vision-PL** — własny ultramały
 polski VLM (vision encoder ≈ 86M + projector 10–30M + goLLeM-110M-PL-SFT
 ≈ 210–230M param.) na bazie modeli [SlayerLab](https://huggingface.co/SlayerLab).
 
+## SLAYER-Vision-PL (tor badawczy)
+
+Ultramały polski VLM na bazie własnych modeli SlayerLab — przyszły, w pełni
+własny model do tego samego produktu (obecny MVP używa Gemma 3n).
+
+```
+obraz 224×224 → SigLIP-base (zamrożony) → 196 tokenów → projector MLP
+→ tokeny obrazu + tokeny tekstu → goLLeM-110M-PL-SFT (LoRA) → zdanie PL
+```
+
+| Metryka | Wartość |
+|---|---|
+| Parametry łącznie | **206,6 M** (zmierzone w `smoke_test.py`) |
+| Trenowalne (projector + LoRA r=16) | **3,74 M** |
+| Budżet kontekstu | 196 (obraz) + tekst + odpowiedź ≤ 512 (ctx GoLLeM) |
+| Format danych | JSONL: `{"image": "plik.jpg", "text": "Krótkie zdanie PL."}` |
+
+Kod: `slayer_vision/` — `model.py` (okablowanie), `data.py` (dataset),
+`train.py` (pętla treningowa), `smoke_test.py` (dowód na CPU).
+
+```bash
+cd slayer_vision
+python smoke_test.py                                  # forward/backward w realnych wymiarach
+python -m slayer_vision.train --data-jsonl data/captions.jsonl --image-root data/images
+```
+
+Zapis checkpointu: `projector.pt` + adaptery LoRA (`lora/`) + manifest
+`slayer_vision.json` — do dołożenia w aplikacji zamiast Gemma 3n, gdy tor
+treningowy domknie jakość.
+
+**Plan danych:** specjalizowany, zamknięty katalog ~200 typów scen
+(zdjęcie → jedno zdanie) — 110M model halucynuje w otwartym „opisz świat",
+więc uczymy wąskiego zachowania produktowego. Źródła: synteza dokumentów
+z PolOCRBench/OCR_engine (sceny „przeczytaj list/rachunek"), zdjęcia
+przedmiotów codziennych i opakowań.
+
 ## Struktura
 
 ```
