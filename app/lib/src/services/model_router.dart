@@ -1,10 +1,13 @@
 import 'dart:typed_data';
 
+import '../prompts.dart';
+
 import 'gemma_service.dart';
+import 'ocr_service.dart';
 import 'slayer_service.dart';
 
-/// Wybór silnika odpowiedzi: Gemma 3n (flutter_gemma) albo SLAYER-Vision
-/// (własny goLLeM w ONNX). Ustawiany przy wczytywaniu modelu w Setup.
+/// Gemma rozumie pytanie + zdjęcie. SLAYER tylko podpisuje obraz; pytania
+/// o tekst, datę, kwotę i opisany napisami panel obsługuje lokalny OCR.
 enum EngineKind { gemma, slayer }
 
 abstract final class ModelRouter {
@@ -12,13 +15,31 @@ abstract final class ModelRouter {
 
   static bool get slayerReady => SlayerService.instance.isReady;
 
-  /// Strumień tokenów odpowiedzi dla zdjęcia.
-  static Stream<String> ask(Uint8List jpeg, String question) {
-    switch (engine) {
-      case EngineKind.slayer:
-        return SlayerService.instance.ask(jpeg);
-      case EngineKind.gemma:
-        return GemmaService.instance.ask(jpeg, question);
+  /// Pytanie jest przekazywane Gemmie; SLAYER używa jawnego rodzaju zadania.
+  static Stream<String> ask(
+    Uint8List? jpeg,
+    String question, {
+    required String imagePath,
+    required AskIntent? intent,
+  }) async* {
+    if (engine == EngineKind.gemma) {
+      yield* GemmaService.instance.ask(jpeg!, question);
+      return;
+    }
+    switch (intent) {
+      case AskIntent.scene:
+      case AskIntent.object:
+        yield 'Może to być: ';
+        yield* SlayerService.instance.ask(jpeg!);
+        return;
+      case AskIntent.readText:
+      case AskIntent.expiry:
+      case AskIntent.payment:
+      case AskIntent.powerButton:
+        yield await OcrService.answer(imagePath, intent!);
+        return;
+      case null:
+        yield 'Model SLAYER rozpoznaje tylko dostępne polecenia. Wybierz opis zdjęcia, tekst, datę, kwotę albo przycisk z czytelnym napisem.';
     }
   }
 }

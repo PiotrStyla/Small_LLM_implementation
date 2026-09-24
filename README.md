@@ -16,9 +16,14 @@ Offline, Guided Vision jako punkty odniesienia).
 
 - 📸 **Jeden duży przycisk „Pokaż i zapytaj"** — zdjęcie + domyślne pytanie
   „Co jest przede mną?".
-- 💊 **Predefiniowane pytania**: „Co to jest?", „Przeczytaj tekst",
-  „Data ważności", „Ile do zapłaty?", „Który przycisk?".
-- 🎤 **Pytania głosem** (systemowy ASR, polski).
+- **„Co to jest?"** — podpis obrazu SLAYER lub pytanie do Gemma 3n.
+- **Polecenia tekstowe**: „Przeczytaj tekst" (cały odczyt), „Data ważności"
+  (tylko data obok oznaczenia terminu), „Ile do zapłaty?" (kwota oznaczona na
+  paragonie) — lokalny OCR ML Kit; bez tekstu nie zgaduje cyfr.
+- **Który przycisk?**: szuka czytelnego napisu zasilania (np. POWER/ON-OFF);
+  nie rozpoznaje samej ikony ani nie wskazuje położenia przycisku.
+- **Pytania głosem** (systemowy ASR, polski); w trybie SLAYER obsługiwane są
+  wyłącznie rozpoznane polecenia z powyższego katalogu.
 - 🔊 **Odpowiedź głosowa** (systemowy TTS — ten sam głos/tempo, którego
   użytkownik używa w czytniku ekranu) + duży, czytelny tekst.
 - 📴 **Offline po pobraniu modelu** — obrazy nie opuszczają urządzenia.
@@ -32,12 +37,15 @@ Offline, Guided Vision jako punkty odniesienia).
 | App | Flutter (Android + iOS, jeden kod) | flutter_gemma jest natywnie multiplatformowy |
 | Model | **SLAYER-Vision-PL** (ONNX) lub Gemma 3n E2B (`.litertlm`) | własny mały model opisujący zdjęcia albo model ogólny odpowiadający na pytania |
 | Inference | `onnxruntime` lub `flutter_gemma` + `flutter_gemma_litertlm` | lokalnie na Androidzie i iOS |
+| Tekst na zdjęciu | ML Kit Latin (model dołączony do aplikacji) | OCR na pełnym zdjęciu, lokalnie |
 | TTS / ASR | `flutter_tts` / `speech_to_text` | systemowe — zero dodatkowych modeli, znajomy głos |
 | Kamera | `camera` | standard Fluttera |
 
 SLAYER-Vision-PL (SigLIP-base + projector + goLLeM-110M-PL-SFT) opisuje zdjęcie
-jednym zdaniem. Nie interpretuje pytania ani nie zastępuje OCR cyfr; pytania
-głosowe i presety mają pełne znaczenie tylko z Gemma 3n.
+jednym zdaniem i **nie rozumie pytania**. Opis może mylić obiekty, zwłaszcza
+na rozmazanych zdjęciach. Zadania tekstowe aplikacja kieruje do OCR zamiast
+udawać, że model przeczytał datę lub kwotę. Dowolne pytania o zdjęcie
+wymagają Gemma 3n.
 
 ## SLAYER-Vision-PL
 
@@ -160,7 +168,7 @@ app/                      # aplikacja Flutter (android + ios)
 ## Uruchomienie
 
 Wymagania: Flutter **≥ 3.44** (sprawdzone na 3.47.5), Android arm64 lub
-iOS 15+.
+iOS 15.5+ (wymóg ML Kit).
 
 ```bash
 cd app
@@ -192,10 +200,13 @@ flutter build ipa --release        # iOS (wymaga macOS + certyfikatów)
 
 ## Ograniczenia MVP
 
-- Model ~2 GB — pierwsze uruchomienie wymaga Wi-Fi i ~2 GB wolnego miejsca.
-- Odpowiedzi są celowo krótkie i z zamkniętego katalogu pytań; otwarte
-  „opisz świat" przy tej klasie modelu halucynuje — to świadomy kompromis.
-- `.litertlm` = Android tylko `arm64-v8a` (zawężone w `build.gradle.kts`).
+- SLAYER (~897 MB) generuje podpis obrazu, nie odpowiedź na swobodne pytanie;
+  wynik jest niepewny i może być błędny. Nie polegać na nim w kwestiach
+  bezpieczeństwa, leków czy orientacji bez dodatkowej weryfikacji.
+- OCR wymaga ostrego ujęcia czytelnej etykiety/dat/kwoty; po braku danych
+  prosi o ponowne zdjęcie. Wskazanie przycisku po samej ikonie nie działa.
+- Gemma 3n (~2 GB) wymaga licencji i pobrania; `.litertlm` na Androidzie
+  wymaga `arm64-v8a` (zawężone w `build.gradle.kts`).
 
 ## Licencja
 

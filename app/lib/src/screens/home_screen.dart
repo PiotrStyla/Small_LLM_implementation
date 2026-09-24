@@ -83,8 +83,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await TtsService.instance.speak(message);
   }
 
-  /// Główny przepływ: zdjęcie → zapytanie do Gemma 3n → odpowiedź głosowa.
-  Future<void> _ask(String question) async {
+  /// Zdjęcie → opis sceny lub zadanie OCR → odpowiedź głosowa.
+  Future<void> _ask(String question, {AskIntent? intent}) async {
     final controller = _camera;
     if (_busy || controller == null || !controller.value.isInitialized) {
       if (controller == null) await _speakError(StatusTexts.noCamera);
@@ -98,12 +98,24 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await TtsService.instance.speak(StatusTexts.capturing);
     try {
       final XFile shot = await controller.takePicture();
-      final Uint8List jpeg = await shot.readAsBytes();
+      // OCR czyta JPEG ze ścieżki w pełnej rozdzielczości; nie kopiuj zdjęcia
+      // do pamięci Dart, gdy nie uruchamiamy modelu obrazowego.
+      final Uint8List? jpeg =
+          ModelRouter.engine == EngineKind.gemma ||
+              intent == AskIntent.scene ||
+              intent == AskIntent.object
+          ? await shot.readAsBytes()
+          : null;
       setState(() => _status = StatusTexts.thinking);
       await TtsService.instance.speak(StatusTexts.thinking);
 
       final buffer = StringBuffer();
-      await for (final token in ModelRouter.ask(jpeg, question)) {
+      await for (final token in ModelRouter.ask(
+        jpeg,
+        question,
+        imagePath: shot.path,
+        intent: intent,
+      )) {
         buffer.write(token);
         if (mounted) setState(() => _answer = buffer.toString());
       }
@@ -131,7 +143,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await _speakError(StatusTexts.noSpeech);
       return;
     }
-    await _ask(question);
+    await _ask(question, intent: intentForVoice(question));
   }
 
   @override
@@ -156,7 +168,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               height: 76,
               child: ListView(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 children: [
                   for (final preset in kPresets)
                     Padding(
@@ -164,17 +179,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       child: Semantics(
                         button: true,
                         label: 'Zapytaj: ${preset.label}',
+                        hint: preset.intent == AskIntent.powerButton &&
+                                ModelRouter.engine == EngineKind.slayer
+                            ? 'W trybie SLAYER rozpoznaje wyłącznie czytelny napis zasilania; nie wskazuje położenia ani samej ikony.'
+                            : null,
                         child: ActionChip(
                           avatar: Icon(preset.icon, size: 28),
                           label: Text(
-                            preset.label,
+                            preset.intent == AskIntent.powerButton &&
+                                    ModelRouter.engine == EngineKind.slayer
+                                ? 'Który przycisk? (napis)'
+                                : preset.label,
                             style: const TextStyle(fontSize: 18),
                           ),
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
                             vertical: 12,
                           ),
-                          onPressed: _busy ? null : () => _ask(preset.question),
+                          onPressed: _busy
+                              ? null
+                              : () => _ask(
+                                  preset.question,
+                                  intent: preset.intent,
+                                ),
                         ),
                       ),
                     ),
@@ -201,7 +228,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           ),
                           onPressed: _busy
                               ? null
-                              : () => _ask(kPresets.first.question),
+                              : () => _ask(
+                                  kPresets.first.question,
+                                  intent: kPresets.first.intent,
+                                ),
                           icon: const Icon(Icons.camera_alt, size: 40),
                           label: const Text(StatusTexts.askButton),
                         ),

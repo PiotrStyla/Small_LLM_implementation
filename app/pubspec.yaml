@@ -1,5 +1,5 @@
 name: vision_assistant
-description: "Asystent wzrokowy dla osób niewidomych — Gemma 3n w całości na urządzeniu (Android i iOS)."
+description: "Asystent wzrokowy offline: SLAYER-Vision lub Gemma 3n, OCR i TTS (Android/iOS)."
 publish_to: 'none'
 version: 0.1.0+1
 
@@ -20,6 +20,8 @@ dependencies:
   onnxruntime: ^1.4.1
   image: ^4.5.0
   path_provider: ^2.1.4
+  # Pakietowy, lokalny model OCR (pismo łacińskie) do tekstu, dat i paragonów.
+  google_mlkit_text_recognition: ^0.17.1
 
 dev_dependencies:
   flutter_test:

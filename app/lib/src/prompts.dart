@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 
-/// Predefiniowane pytania dla trybu „pokaż i zapytaj".
-///
-/// Zakres jest celowo zamknięty: model ma odpowiadać krótko i przewidywalnie,
-/// a użytkownik nie musi uczyć się formułowania promptów.
+/// SLAYER jest modelem podpisów obrazów; zadania tekstowe obsługuje OCR.
+enum AskIntent { scene, object, readText, expiry, payment, powerButton }
+
 class AskPreset {
-  const AskPreset(this.label, this.question, this.icon);
+  const AskPreset(this.label, this.question, this.icon, this.intent);
 
-  /// Etykieta na przycisku (mówiona przez TTS i czytana przez TalkBack).
   final String label;
-
-  /// Treść zapytania wysyłanego do modelu wraz ze zdjęciem.
   final String question;
-
   final IconData icon;
+  final AskIntent intent;
 }
 
 /// Stały suffix stylu — krótkie, jednozdaniowe odpowiedzi po polsku.
@@ -25,33 +21,72 @@ const List<AskPreset> kPresets = [
     'Co jest przede mną?',
     'Opisz co widzisz na tym zdjęciu.',
     Icons.center_focus_strong,
+    AskIntent.scene,
   ),
   AskPreset(
     'Co to jest?',
     'Co to za przedmiot?',
     Icons.help_outline,
+    AskIntent.object,
   ),
   AskPreset(
     'Przeczytaj tekst',
     'Przeczytaj cały tekst widoczny na tym zdjęciu.',
     Icons.menu_book,
+    AskIntent.readText,
   ),
   AskPreset(
     'Data ważności',
     'Jaka jest data ważności lub termin przydatności na tym opakowaniu?',
     Icons.event,
+    AskIntent.expiry,
   ),
   AskPreset(
     'Ile do zapłaty?',
     'Ile mam zapłacić według tego rachunku? Podaj kwotę.',
     Icons.payments,
+    AskIntent.payment,
   ),
   AskPreset(
     'Który przycisk?',
     'Który przycisk na tym urządzeniu służy do włączania? Opisz jego położenie.',
     Icons.smart_button,
+    AskIntent.powerButton,
   ),
 ];
+
+/// Pytania głosowe SLAYER: rozpoznaj wyłącznie znane polecenia.
+/// Innych pytań model podpisów obrazów nie potrafi wykonać.
+AskIntent? intentForVoice(String question) {
+  final text = question.toLowerCase();
+  if (text.contains('ważnoś') || text.contains('termin przydatnoś')) {
+    return AskIntent.expiry;
+  }
+  if (text.contains('zapłaci') ||
+      text.contains('do zapłaty') ||
+      text.contains('paragon') ||
+      text.contains('rachunek')) {
+    return AskIntent.payment;
+  }
+  if (text.contains('przycisk') || text.contains('włącz')) {
+    return AskIntent.powerButton;
+  }
+  if (text.contains('przeczytaj') ||
+      text.contains('odczytaj') ||
+      text.contains('tekst') ||
+      text.contains('napis')) {
+    return AskIntent.readText;
+  }
+  if (text.contains('co to jest') || text.contains('jaki to przedmiot')) {
+    return AskIntent.object;
+  }
+  if (text.contains('przede mną') ||
+      text.contains('co widzisz') ||
+      text.contains('opisz')) {
+    return AskIntent.scene;
+  }
+  return null;
+}
 
 /// Buduje pełne zapytanie: pytanie użytkownika + wymuszenie stylu odpowiedzi.
 String buildQuestion(String question) => '$question$kStyleSuffix';
