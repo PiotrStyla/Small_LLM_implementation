@@ -81,13 +81,16 @@ Kod: `slayer_vision/` — `model.py` (okablowanie), `data.py` (dataset),
 
 ```bash
 cd slayer_vision
-python smoke_test.py                                  # forward/backward w realnych wymiarach
-python -m slayer_vision.build_dataset --out out/dataset --per-kind 40 --photos photos
-python -m slayer_vision.train --data-jsonl out/dataset/train.jsonl \
-    --image-root out/dataset/images --steps 1000 --batch-size 4 --augment
-python -m slayer_vision.evaluate --checkpoint out/run-150 \
-    --data-jsonl out/dataset/eval.jsonl --image-root out/dataset/images
+python -m pip install -r requirements.txt
+python smoke_test.py
+python -m slayer_vision.build_dataset --out out/dataset-safe --per-kind 40 --photos photos
 ```
+
+`build_dataset` domyślnie **pomija nieprzejrzane zdjęcia Commons**. Ich
+automatyczne przypisanie na podstawie wyszukiwania okazało się błędne; dopiero
+lista zatwierdzonych plików `--reviewed-photos photos/approved.txt` dopuszcza
+je do treningu. Każdy wiersz listy ma postać `kategoria/scena/commons__NN.jpg`;
+zatwierdzaj tylko zdjęcie zgodne z opisem, nie na podstawie nazwy katalogu.
 
 ### Eksport on-device (ONNX)
 
@@ -142,24 +145,104 @@ Dwa źródła próbek:
    list/pismo, metka z ceną. Zdanie generowane z tych samych slotów, które
    są rysowane (kwota, data, nazwa leku, położenie przycisku) — GT dokładne
    co do grosza, jak w syntezie PolOCRBench.
-2. **Zdjęcia** — dwa źródła:
-   - **Wikimedia Commons (bez Twoich zdjęć!)** — `python -m slayer_vision.fetch_commons`
-     pobiera otwarte zdjęcia (CC0/PD/CC BY/CC BY-SA) i zapisuje atrybucję
-     w `photos/ATTRIBUTION.json`. Aktualnie: 692 zdjęć dla 178/200 scen.
-     Trafność weryfikujesz na `photos/REVIEW.html`
-     (`python -m slayer_vision.review`) — nietrafione pliki kasujesz ręcznie.
-   - **Własne** — wrzucaj do `slayer_vision/photos/<scene_id>/*.jpg`;
-     builder przepisuje je do zbioru ze zdaniem docelowym z katalogu.
-     Lista scen bez zdjęć: `photos_missing.txt`.
+2. **Zdjęcia:** w `photos/` znajdują się pobrane miniatury Commons z
+   `photos/ATTRIBUTION.json`, ale **nie są automatycznie czystym zbiorem**.
+   Kontrola wizualna ujawniła w klasie „karton soku” drogę, żabę i owady,
+   a w „karton mleka” m.in. szklankę mleka. Próbny przebieg buildera pominął
+   **785/785** takich niezweryfikowanych zdjęć. Własne poprawnie opisane kadry
+   można dodawać do `photos/<scene_id>/*.jpg`; obce zdjęcia `commons__*`
+   wymagają ręcznego zatwierdzenia w `--reviewed-photos`.
+
+Stary checkpoint `run-final` wytrenowano na danych sprzed tej kontroli.
+Wynik **114/319 exact** na dawnym `eval.jsonl` jest wynikiem dla
+**zanieczyszczonego, częściowo źle oznaczonego zbioru**, a nie miarą
+rozpoznawania rzeczywistych przedmiotów.
+
+### Niezależny zbiór obiektów COCO 2017
+
+`build_coco_objects.py` używa anotacji prostokątów obiektów z
+[COCO 2017](https://cocodataset.org/dataset/detection-2017.htm):
+przycina obiekt, przypisuje krótkie polskie zdanie, rozdziela obrazy
+`train2017` i `val2017` i zachowuje URL źródłowy, prostokąt oraz
+**indywidualną licencję zdjęcia** w `attribution.jsonl`. Wybiera tylko
+zdjęcia oznaczone CC BY lub CC BY-SA; adnotacje COCO to
+[CC BY 4.0](https://cocodataset.org/#termsofuse). Źródłowe zdjęcia nie
+są częścią repozytorium. Lista `coco_val_reviewed.txt` zawiera identyfikatory
+38 ręcznie przejrzanych zdjęć 12 klas; **treningowe kadry opierają się na
+anotacjach COCO, nie przeszły indywidualnej kontroli wizualnej**.
+To test wybranych obiektów na przyciętych fotografiach, nie test telefonu
+na ulicy ani poprawności kartonów soku lub soli (COCO nie obejmuje ich tu).
 
 ```bash
-python -m slayer_vision.build_dataset --out out/dataset --per-kind 40 --photos photos
+cd slayer_vision
+curl -fL https://s3.amazonaws.com/images.cocodataset.org/annotations/annotations_trainval2017.zip \
+    -o out/annotations_trainval2017.zip
+python -m slayer_vision.build_coco_objects \
+    --annotations-zip out/annotations_trainval2017.zip --out out/coco-objects \
+    --train-per-class 16 --eval-per-class 4 --reviewed-val coco_val_reviewed.txt
+python -m slayer_vision.evaluate --checkpoint out/run-final \
+    --data-jsonl out/coco-objects/eval-reviewed.jsonl \
+    --image-root out/coco-objects/images
 ```
 
-Podział train/eval: co piąta próbka grupy → eval (nowe ujęcia tych samych
-scen, nie nowe kategorie). Obecnie wygenerowane: 280 próbek syntetycznych
-(224/56). Weryfikacja formatu: `CaptionDataset` + `collate` (padding maskowany
-przez -100).
+`out/coco-objects/train-target-classes.jsonl` zawiera 192 kadry, a
+`eval-reviewed.jsonl` 38 niezależnych zdjęć. Przed dalszym treningiem
+stary model uzyskał na nich **9/38 exact (23,7%)**, F1 tokenów **0,613**.
+
+### Dalszy trening — rozpoznawanie obiektów (2026-09-25)
+
+Trzy przebiegi na CPU (`torch 2.13`, batch 1, wznawiane z `run-final`),
+każdy oceniany na tych samych 38 zdjęciach:
+
+| Checkpoint | Kroki | Dane | Obiekty exact | Obiekty F1 |
+|---|---:|---|---:|---:|
+| `run-final` | 3600 | stary zbiór (zanieczyszczony) | 9/38 (23,7%) | 0,613 |
+| `run-coco-objects` | 60 | 192 kadry COCO | 24/38 (63,2%) | 0,808 |
+| `run-mixed` | +120 | COCO + 488 zdań syntetycznych | 29/38 (76,3%) | 0,876 |
+| `run-mixed-long` | +300 | jw., LR 8e-5/1,5e-5 | **31/38 (81,6%)** | **0,913** |
+
+Wzrost jest nierówny per klasa (`run-mixed-long` vs baseline): zegar 0/4→4/4,
+telewizor 0/4→4/4, butelka 0/3→3/3, kubek 1/3→3/3, telefon 2/4→4/4,
+książka 3/4→4/4, klawiatura 0/4→3/4, łóżko 1/2→2/2, krzesło 0/2→1/2;
+słabe punkty: pilot 0/2, kanapa 1/3, mysz 2/3. Pozostałe pomyłki to sąsiednie
+klasy (kanapa↔łóżko↔krzesło, pilot→telewizor/telefon, mysz→klawiatura).
+**n=38 — przedziały niepewności są szerokie; to nie jest skuteczność uliczna.**
+
+Dwa skutki uboczne, zmierzone a nie założone:
+
+1. **Krótkie podpisy COCO ucinają zdania na zdjęciach realnych.** Po
+   samym treningu COCO model zaczął kończyć po dwóch słowach
+   („To kostka masła.” → „To kostka.”; 34/319 ucięć vs 2/319 w baseline).
+   Domykanie długimi zdaniami syntetycznymi naprawiło zdania dokumentów
+   (probe 20/20 exact, pełne zdania) i obiekty, ale na zdjęciach realnych
+   kwalifikatory nadal bywają ucinane („To butelka wody mineralnej.” →
+   „To butelka.”). Nazwa obiektu pozostaje poprawna; model mówi krócej.
+2. **Spadek exact na starym `eval.jsonl` jest częściowo pozorny.** Rozbicie
+   `run-final` → `run-mixed-long` na tym samym zbiorze:
+   - syntetyka (pewne GT): **31/122 → 34/122 exact, F1 0,794 → 0,829** — lepiej;
+   - zdjęcia (etykiety błędne): 83/197 → 60/197 exact, F1 0,642 → 0,643 —
+     exact spada głównie przez ucinanie kwalifikatorów i odejście od złych
+     etykiet; to nie jest rzetelny pomiar jakości.
+
+Tekst w aplikacji czyta **osobny OCR ML Kit** — żaden z tych przebiegów nie
+zmienia ścieżki OCR ani reguł dat/kwot.
+
+Przepis dla `run-mixed-long`:
+
+```bash
+python -m slayer_vision.merge_caption_sets --out out/mixed/train.jsonl \
+    out/dataset/train-synthetic.jsonl out/dataset/images \
+    out/coco-objects/train-target-classes.jsonl out/coco-objects/images
+python -m slayer_vision.train --data-jsonl out/mixed/train.jsonl \
+    --resume-from out/run-final --reset-optimizer --output-dir out/run-coco-objects \
+    --steps 60 --batch-size 1 --lr-projector 1.5e-4 --lr-lora 3e-5 --save-every 20
+python -m slayer_vision.train --data-jsonl out/mixed/train.jsonl \
+    --resume-from out/run-coco-objects --reset-optimizer --output-dir out/run-mixed \
+    --steps 120 --batch-size 1 --lr-projector 1.5e-4 --lr-lora 3e-5 --save-every 40
+python -m slayer_vision.train --data-jsonl out/mixed/train.jsonl \
+    --resume-from out/run-mixed --reset-optimizer --output-dir out/run-mixed-long \
+    --steps 300 --batch-size 1 --lr-projector 8e-5 --lr-lora 1.5e-5 --save-every 100
+```
 
 ## Struktura
 

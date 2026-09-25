@@ -7,6 +7,7 @@ Użycie:
 
 import argparse
 import json
+import os
 import random
 from pathlib import Path
 
@@ -70,15 +71,23 @@ def save_checkpoint(
     step: int = 0,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
-    torch.save(model.projector.state_dict(), output_dir / "projector.pt")
+
+    def _atomic_save(state: dict, name: str) -> None:
+        # Zapis przez plik tymczasowy + zamianę: przerwanie okna nie zostawia
+        # połówkowego `projector.pt`, który później psuje `--resume-from`.
+        temporary = output_dir / f"{name}.tmp"
+        torch.save(state, temporary)
+        os.replace(temporary, output_dir / name)
+
+    _atomic_save(model.projector.state_dict(), "projector.pt")
     model.lm.save_pretrained(output_dir / "lora")
     tokenizer.save_pretrained(output_dir / "tokenizer")
     if optimizer is not None:
         # Stan optymalizatora + numer kroku — `--resume-from` kontynuuje bieg
         # w kolejnym oknie czasowym (job na CPU ma limit ~1 h).
-        torch.save(
+        _atomic_save(
             {"step": step, "optimizer": optimizer.state_dict()},
-            output_dir / "training_state.pt",
+            "training_state.pt",
         )
     manifest = {
         "base_lm": GOLLEM_REPO,
@@ -125,7 +134,7 @@ def train(config: TrainConfig) -> None:
     model.train()
     model.vision.eval()
     step, running = 0, 0.0
-    if config.resume_from:
+    if config.resume_from and not config.reset_optimizer:
         state_path = Path(config.resume_from) / "training_state.pt"
         if state_path.exists():
             state = torch.load(state_path, map_location="cpu", weights_only=True)
@@ -179,6 +188,11 @@ def main() -> None:
         default=None,
         help="katalog poprzedniego biegu — kontynuuje od zapisanego kroku",
     )
+    parser.add_argument(
+        "--reset-optimizer",
+        action="store_true",
+        help="nowy zbiór: wczytaj wagi checkpointu, ale zresetuj optimizer i licznik kroków",
+    )
     args = parser.parse_args()
 
     train(
@@ -198,6 +212,7 @@ def main() -> None:
             save_every=args.save_every,
             hf_token=args.hf_token,
             resume_from=args.resume_from,
+            reset_optimizer=args.reset_optimizer,
         )
     )
 

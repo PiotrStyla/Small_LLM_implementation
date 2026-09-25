@@ -40,6 +40,8 @@ class TrainConfig:
     # Wznawianie treningu (kolejne okno 1 h na CPU): katalog z poprzedniego
     # biegu zawiera adaptery, projector i `training_state.pt`.
     resume_from: str | None = None
+    # Nowy zbiór: zachowaj adapter/projector, lecz zacznij nowy bieg i LR.
+    reset_optimizer: bool = False
     log_every: int = 10
     save_every: int = 250
     hf_token: str | None = None

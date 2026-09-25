@@ -1,12 +1,12 @@
 """Buduje dataset SLAYER-Vision-PL: obrazy + `train.jsonl`/`eval.jsonl`.
 
-Dwa źródeł próbek:
+Dwa źródła próbek:
 1. syntetyka (`synth`): renderowane dokumenty/panele z dokładnym GT;
-2. zdjęcia: `photos/<scene_id>/*.jpg` zrobione do katalogu `scenes`.
+2. zdjęcia: `photos/<scene_id>/*.jpg`; pobrane zdjęcia `commons__*` trafiają
+   do zbioru wyłącznie po ręcznej akceptacji w `--reviewed-photos`.
 
 Podział train/eval: co piąta próbka grupy (sceny/typu syntetyki) idzie do
-eval — ten sam obiekt, inne obrazy, czyli pomiar generalizacji na nowe
-ujęcie, nie na nową kategorię.
+eval — nowe ujęcie tej samej kategorii, nie test nowych kategorii.
 
 Użycie:
     python -m slayer_vision.build_dataset --out out/dataset \
@@ -45,10 +45,18 @@ def build(
     photos_dir: Path | None,
     seed: int,
     with_crops: bool = True,
+    reviewed_photos: Path | None = None,
 ) -> None:
     images_dir = out_dir / "images"
     images_dir.mkdir(parents=True, exist_ok=True)
     rng = random.Random(seed)
+    approved = set()
+    if reviewed_photos is not None:
+        approved = {
+            line.strip() for line in reviewed_photos.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.startswith("#")
+        }
+    unreviewed = 0
     records: list[dict] = []
 
     # 1) Syntetyka z pełnym GT (+ opcjonalnie widok 2: crop slotu — zbliżenie,
@@ -79,6 +87,16 @@ def build(
             scene_dir = photos_dir / scene.id
             scene_dir.mkdir(parents=True, exist_ok=True)  # katalog na zdjęcia
             photos = sorted(scene_dir.glob("*.jpg"))
+            unreviewed += sum(
+                photo.name.startswith("commons__")
+                and f"{scene.id}/{photo.name}" not in approved
+                for photo in photos
+            )
+            photos = [
+                photo for photo in photos
+                if not photo.name.startswith("commons__")
+                or f"{scene.id}/{photo.name}" in approved
+            ]
             if not photos:
                 missing.append(scene.id)
                 continue
@@ -110,6 +128,7 @@ def build(
     print(f"Syntetyka: {kinds} typów × {per_kind} = {kinds * per_kind}")
     print(f"Zdjęcia: {photos_used} plików dla {len(SCENES) - len(missing)}/{len(SCENES)} scen")
     print(f"Sceny bez zdjęć: {len(missing)} (lista: {out_dir / 'photos_missing.txt'})")
+    print(f"Pominięte zdjęcia Commons bez ręcznej weryfikacji: {unreviewed}")
     print(f"Wyjście: {out_dir}")
 
 
@@ -124,6 +143,11 @@ def main() -> None:
         action="store_true",
         help="bez widoku 2 (cropów slotów) dla scen cyfrowych",
     )
+    parser.add_argument(
+        "--reviewed-photos",
+        type=Path,
+        help="plik z ręcznie zatwierdzonymi ścieżkami scene/id/commons__NN.jpg",
+    )
     args = parser.parse_args()
     build(
         Path(args.out),
@@ -131,6 +155,7 @@ def main() -> None:
         Path(args.photos) if args.photos else None,
         args.seed,
         with_crops=not args.no_crops,
+        reviewed_photos=args.reviewed_photos,
     )
 
 
