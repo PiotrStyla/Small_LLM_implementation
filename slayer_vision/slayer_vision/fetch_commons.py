@@ -54,6 +54,17 @@ def _api(params: dict) -> dict:
 
 # Sceny, przy których polskie zapytania nie dały wyników — angielskie hasła.
 ENGLISH_QUERIES = {
+    "wnetrza/korytarz": "hallway",
+    "wnetrza/przedpokoj": "home entrance hall",
+    "wnetrza/pokoj": "bedroom",
+    "wnetrza/salon": "living room",
+    "wnetrza/kuchnia": "home kitchen",
+    "wnetrza/lazienka": "bathroom",
+    "wnetrza/schody": "staircase home",
+    "rosliny/kwiaty-doniczkowe": "potted flowers",
+    "rosliny/roslina-doniczkowa": "houseplant",
+    "rosliny/kwiaty-wazonie": "bouquet of flowers",
+    "rosliny/kwiaty-na-mebelu": "flowers on table",
     "leki/bateria-aparat-sluchowy": "hearing aid battery",
     "leki/pampersy": "adult diaper package",
     "leki/chusteczki": "tissue box",
@@ -88,10 +99,10 @@ ENGLISH_QUERIES = {
 
 def _queries(name: str, scene_id: str) -> list[str]:
     fallback = scene_id.split("/")[-1].replace("-", " ")
-    queries = [name]
     english = ENGLISH_QUERIES.get(scene_id)
-    if english:
-        queries.append(english)
+    # Angielskie hasło najpierw: polskie nazwy bywają nazwami miejsc
+    # („salon” → place, „pokój” → Pokój, „kuchnia” → kanał TV).
+    queries = ([english] if english else []) + [name]
     if fallback != name:
         queries.append(fallback)
     return queries

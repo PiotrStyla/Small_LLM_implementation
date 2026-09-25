@@ -1,0 +1,55 @@
+# Ręcznie zatwierdzone zdjęcia Commons dla scen wnętrz i roślin (2026-09-25).
+# Format: scene_id/plik — zgodny z --reviewed-photos build_dataset.
+# Odrzucono 37/88: malarstwo (Pieter de Hooch, Rousseau, Brueghel), nazwy miejsc
+# („salon” → place, „pokój” → Pokój), kanał TV, jaskinie zamiast schodów, bukiety bez wazonu.
+wnetrza/korytarz/commons__00.jpg
+wnetrza/korytarz/commons__01.jpg
+wnetrza/korytarz/commons__02.jpg
+wnetrza/korytarz/commons__03.jpg
+wnetrza/korytarz/commons__04.jpg
+wnetrza/przedpokoj/commons__01.jpg
+wnetrza/przedpokoj/commons__02.jpg
+wnetrza/przedpokoj/commons__04.jpg
+wnetrza/pokoj/commons__02.jpg
+wnetrza/pokoj/commons__03.jpg
+wnetrza/pokoj/commons__04.jpg
+wnetrza/pokoj/commons__05.jpg
+wnetrza/pokoj/commons__06.jpg
+wnetrza/pokoj/commons__07.jpg
+wnetrza/salon/commons__00.jpg
+wnetrza/salon/commons__01.jpg
+wnetrza/salon/commons__03.jpg
+wnetrza/salon/commons__04.jpg
+wnetrza/salon/commons__06.jpg
+wnetrza/salon/commons__07.jpg
+wnetrza/kuchnia/commons__00.jpg
+wnetrza/kuchnia/commons__03.jpg
+wnetrza/kuchnia/commons__04.jpg
+wnetrza/kuchnia/commons__05.jpg
+wnetrza/kuchnia/commons__06.jpg
+wnetrza/kuchnia/commons__07.jpg
+wnetrza/lazienka/commons__00.jpg
+wnetrza/lazienka/commons__01.jpg
+wnetrza/lazienka/commons__03.jpg
+wnetrza/lazienka/commons__04.jpg
+wnetrza/lazienka/commons__05.jpg
+wnetrza/lazienka/commons__06.jpg
+wnetrza/schody/commons__00.jpg
+wnetrza/schody/commons__01.jpg
+wnetrza/schody/commons__03.jpg
+wnetrza/schody/commons__06.jpg
+wnetrza/schody/commons__07.jpg
+rosliny/kwiaty-doniczkowe/commons__00.jpg
+rosliny/kwiaty-doniczkowe/commons__03.jpg
+rosliny/kwiaty-doniczkowe/commons__04.jpg
+rosliny/kwiaty-doniczkowe/commons__05.jpg
+rosliny/roslina-doniczkowa/commons__00.jpg
+rosliny/roslina-doniczkowa/commons__03.jpg
+rosliny/roslina-doniczkowa/commons__04.jpg
+rosliny/roslina-doniczkowa/commons__05.jpg
+rosliny/roslina-doniczkowa/commons__07.jpg
+rosliny/kwiaty-wazonie/commons__05.jpg
+rosliny/kwiaty-wazonie/commons__07.jpg
+rosliny/kwiaty-na-mebelu/commons__05.jpg
+rosliny/kwiaty-na-mebelu/commons__06.jpg
+rosliny/kwiaty-na-mebelu/commons__07.jpg

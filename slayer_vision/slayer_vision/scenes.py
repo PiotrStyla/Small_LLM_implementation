@@ -262,9 +262,26 @@ MISC = _rows("Różne", [
     ("rozne/lustro", "lustro", "To lustro."),
 ])
 
-SCENES: tuple[Scene, ...] = tuple(FOOD + HEALTH + APPLIANCE + REMOTE + DOCS + MONEY + STREET + HOME + SHIPMENTS + MISC)
+INTERIOR = _rows("Wnętrza", [
+    ("wnetrza/korytarz", "korytarz", "To korytarz."),
+    ("wnetrza/przedpokoj", "przedpokój", "To przedpokój."),
+    ("wnetrza/pokoj", "pokój", "To pokój."),
+    ("wnetrza/salon", "salon", "To salon."),
+    ("wnetrza/kuchnia", "kuchnia", "To kuchnia."),
+    ("wnetrza/lazienka", "łazienka", "To łazienka."),
+    ("wnetrza/schody", "schody", "To schody."),
+])
+
+PLANTS = _rows("Rośliny i kwiaty", [
+    ("rosliny/kwiaty-doniczkowe", "kwiaty w doniczce", "To kwiaty w doniczce."),
+    ("rosliny/roslina-doniczkowa", "roślina doniczkowa", "To roślina doniczkowa."),
+    ("rosliny/kwiaty-wazonie", "kwiaty w wazonie", "To kwiaty w wazonie."),
+    ("rosliny/kwiaty-na-mebelu", "kwiaty na szafce", "To kwiaty na szafce."),
+])
+
+SCENES: tuple[Scene, ...] = tuple(FOOD + HEALTH + APPLIANCE + REMOTE + DOCS + MONEY + STREET + HOME + SHIPMENTS + MISC + INTERIOR + PLANTS)
 
 CATEGORIES: tuple[str, ...] = tuple(dict.fromkeys(scene.category for scene in SCENES))
 
-assert len(SCENES) == 200, f"Katalog ma {len(SCENES)} scen, oczekiwano 200"
+assert len(SCENES) == 211, f"Katalog ma {len(SCENES)} scen, oczekiwano 211"
 assert len({scene.id for scene in SCENES}) == len(SCENES), "Powtórzone id sceny"

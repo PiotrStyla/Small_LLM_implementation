@@ -253,6 +253,38 @@ Dalszy trening potrzebny — to samo zdanie co po pierwszej iteracji.
 kwoty na rachunkach nadal 0/24 (model ich nie czyta — w aplikacji robi to OCR).
 Zdania syntetyczne bez regresji: 35/122 exact, F1 0,830 (v0.2: 34/122, 0,829).
 
+### Trzecia iteracja — v0.4: sceny wnętrz i roślin (2026-09-25)
+
+**Test rzeczywisty użytkownika:** korytarz/przedpokój nierozpoznany, kwiaty na
+szafce nazwane „Szafkak.” — model miał zamknięty słownik 40 klas obiektów i żadnych
+scen wnętrz; „roślina w doniczce” była 0/2 w benchmarku.
+
+**Dane:** 11 nowych scen (`wnetrza/*`, `rosliny/*` w `scenes.py`, katalog 200 → 211):
+korytarz, przedpokój, pokój, salon, kuchnia, łazienka, schody, kwiaty w doniczce,
+roślina doniczkowa, kwiaty w wazonie, kwiaty na szafce. Zdjęcia z Commons pobrane
+zapytaniami angielskimi (polskie „salon”/„pokój”/„kuchnia” trafiały w nazwy miejsc
+i kanał TV — `fetch_commons._queries` kładzie teraz hasło angielskie najpierw).
+Recenzja ręczna **51/88** (`photos/approved-scenes.txt`): odrzucono malarstwo
+(Pieter de Hooch, Rousseau, Brueghel), jaskinie zamiast schodów, bukiety bez wazonu.
+Trening: sceny ×20 w miksie (2771 próbek), 1000 kroków LR 4e-5 + 800 kroków LR 8e-5.
+
+| Benchmark | v0.3 (`run-v3b`) | **v0.4 (`run-v4b`)** |
+|---|---|---|
+| Sceny wnętrz (11 zdjęć) | 0/11 (0%), F1 0,426 | **6/11 (54,5%)**, F1 0,742 |
+| Nowe klasy obiektów (82) | 40/82 (48,8%) | **63/82 (76,8%)**, F1 0,882 |
+| Stare klasy obiektów (38) | 34/38 (89,5%) | 32/38 (84,2%), F1 0,918 |
+| Czytanie cyfr (414) | 71,7% | **75,1%** |
+
+Sceny po v0.4: korytarz ✓, pokój ✓, kuchnia ✓, łazienka ✓, schody ✓, roślina
+doniczkowa ✓; słabe: salon → „kanapa”, kwiaty w doniczce → „kwiateczka w doniczkowa”,
+kwiaty w wazonie → „wazon” (nazwa pojemnika zamiast zawartości). Przedpokój → „To
+korytarz.” — semantycznie blisko, ale nie exact. **11 zdjęć scen to minimalna próba.**
+
+Zapis uwag: przy pierwszym przebiegu (sceny 5× w miksie, LR 4e-5) model w ogóle
+nie nauczył nowych słów (0/11, wyniki identyczne z baseline) — klasa scenowa
+potrzebuje albo dużo więcej zdjęć, albo wyższego LR i ~20× nadreprezentacji.
+To samo dotyczy przyszłych klas: sama obecność w miksie nie wystarczy.
+
 Przepis iteracji 2:
 
 ```bash
@@ -307,15 +339,15 @@ app/                      # aplikacja Flutter (android + ios)
 
 ## Instalacja na Androidzie
 
-**Pliki do pobrania:** [GitHub Releases — v0.3.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.3.0-objects):
+**Pliki do pobrania:** [GitHub Releases — v0.4.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.4.0-objects):
 
 | Plik | Rozmiar | Zawartość |
 |---|---:|---|
 | `Asystent-wzrokowy.apk` | 224 431 594 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**, nie do Google Play. **Bez zmian od v0.1.0-ocr** (to samo SHA-256) |
-| `SLAYER-Vision-ONNX-IR9-v0.3.zip` | 898 088 813 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.3 (40 klas), `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
+| `SLAYER-Vision-ONNX-IR9-v0.4.zip` | 898 088 877 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.4 (40 klas + sceny wnętrz), `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
 
 Suma SHA-256 APK: `ca5d6daabb1b2b2829de25c6b8849dabd2a370ff5d600bc8b864b70779815797`  
-Suma SHA-256 ZIP: `73df609ab87f46180c6535442b09c7d9c0fcd7120f2427579c7f289995ef64e7`
+Suma SHA-256 ZIP: `102b5201af86787a5ecfc2fe3f91ca4fb8aeb6b429819560f0077e5c2e1a1eda`
 
 **Wymagania:** Android arm64, kilka GB wolnej pamięci wewnętrznej i dużo RAM;
 telefon Samsung SM-A226B przy próbach zgłaszał zamknięcia `LOW_MEMORY`.
@@ -365,7 +397,7 @@ wyłącznie dla Androida.
 
 | Obszar | Zaobserwowano / granica możliwości |
 |---|---|
-| Podpis zdjęcia | Model v0.3: benchmark 38 zdjęć **34/38 (89,5%)** (v0.2: 31/38), nowy benchmark 27 nowych klas **40/82 (48,8%)**; słabe: banan, pies, pluszowy miś, lodówka. Czytanie cyfr przez model 71,7% (kwoty na rachunkach nadal słabe — w aplikacji robi to OCR). Na zdjęciach realnych bywa ucinany kwalifikator („To kostka masła.” → „To kostka.”). Historyczny wynik 114/319 na dawnym `eval.jsonl` dotyczy zbioru z **błędnymi etykietami** — nie jest miarą jakości. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
+| Podpis zdjęcia | Model v0.4: obiekty 63/82 (76,8%) i 32/38 (84,2%), sceny wnętrz 6/11 (54,5%) — korytarz, pokój, kuchnia, łazienka, schody, roślina doniczkowa; słabe: salon, kwiaty w doniczce/wazonie. Czytanie cyfr przez model 75,1% (kwoty na rachunkach nadal słabe — w aplikacji robi to OCR). Na zdjęciach realnych bywa ucinany kwalifikator („To kostka masła.” → „To kostka.”). Historyczny wynik 114/319 na dawnym `eval.jsonl` dotyczy zbioru z **błędnymi etykietami** — nie jest miarą jakości. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
 | Polecenia | SLAYER nie jest VQA i nie potrafi rozumieć swobodnych pytań. „Co jest przede mną?”/„Co to jest?” to ten sam podpis zdjęcia. Tekst/data/kwota idą przez osobny OCR. „Który przycisk?” identyfikuje wyłącznie czytelny napis zasilania; nie wskazuje położenia ani ikony. |
 | OCR | ML Kit Latin działa w release na Samsungu, lecz odręczny numer `12-266-85-28` odczytał jako `R-G6-8S-28`. Reguły dat/rachunków ograniczają zgadywanie, lecz nie naprawiają błędnie odczytanej cyfry. Bez etykiety terminu/kwoty aplikacja odmawia odpowiedzi. **Nie używać samego OCR do decyzji o leku, terminie lub zapłacie.** |
 | Pamięć | Trzy grafy fp32 to ~897 MB na dysku; sesje ONNX na Samsungu osiągały ~0,9–1,1 GB PSS i system zapisał kilka zamknięć `LOW_MEMORY`. Nie ma kwantyzacji ani odciążenia sesji po podpisie. Stabilność długotrwała i działanie na słabszych urządzeniach nie są potwierdzone. |
