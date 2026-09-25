@@ -29,7 +29,6 @@ abstract final class ModelRouter {
     switch (intent) {
       case AskIntent.scene:
       case AskIntent.object:
-        yield 'Może to być: ';
         yield* SlayerService.instance.ask(jpeg!);
         return;
       case AskIntent.readText:

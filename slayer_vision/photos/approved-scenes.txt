@@ -43,6 +43,7 @@ rosliny/kwiaty-doniczkowe/commons__00.jpg
 rosliny/kwiaty-doniczkowe/commons__03.jpg
 rosliny/kwiaty-doniczkowe/commons__04.jpg
 rosliny/kwiaty-doniczkowe/commons__05.jpg
+rosliny/kwiaty-doniczkowe/commons__10.jpg
 rosliny/roslina-doniczkowa/commons__00.jpg
 rosliny/roslina-doniczkowa/commons__03.jpg
 rosliny/roslina-doniczkowa/commons__04.jpg
@@ -53,3 +54,16 @@ rosliny/kwiaty-wazonie/commons__07.jpg
 rosliny/kwiaty-na-mebelu/commons__05.jpg
 rosliny/kwiaty-na-mebelu/commons__06.jpg
 rosliny/kwiaty-na-mebelu/commons__07.jpg
+leki/masc/commons__07.jpg
+leki/masc/commons__10.jpg
+leki/masc/commons__11.jpg
+leki/krople/commons__04.jpg
+leki/krople/commons__05.jpg
+leki/krople/commons__06.jpg
+leki/krople/commons__07.jpg
+leki/syrop/commons__04.jpg
+leki/syrop/commons__06.jpg
+leki/syrop/commons__07.jpg
+rozne/pasta/commons__06.jpg
+rozne/pasta/commons__07.jpg
+rozne/pasta/commons__09.jpg

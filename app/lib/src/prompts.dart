@@ -102,7 +102,8 @@ abstract final class StatusTexts {
   static const String capturing = 'Robię zdjęcie…';
   static const String thinking = 'Analizuję zdjęcie…';
   static const String modelMissing = 'Model nie jest jeszcze pobrany.';
-  static const String modelReady = 'Model gotowy. Możesz robić zdjęcia.';
+  static const String modelReady =
+      'Model gotowy. Small LLM by Fabryka AI. Możesz robić zdjęcia.';
   static const String noCamera = 'Brak dostępu do kamery.';
   static const String noAnswer = 'Nie udało się uzyskać odpowiedzi.';
   static const String noSpeech = 'Nie rozpoznałem pytania.';

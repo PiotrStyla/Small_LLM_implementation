@@ -54,6 +54,10 @@ def _api(params: dict) -> dict:
 
 # Sceny, przy których polskie zapytania nie dały wyników — angielskie hasła.
 ENGLISH_QUERIES = {
+    "leki/masc": "ointment tube",
+    "leki/krople": "eye drops bottle",
+    "leki/syrop": "cough syrup bottle",
+    "rozne/pasta": "toothpaste tube",
     "wnetrza/korytarz": "hallway",
     "wnetrza/przedpokoj": "home entrance hall",
     "wnetrza/pokoj": "bedroom",

@@ -285,6 +285,35 @@ nie nauczył nowych słów (0/11, wyniki identyczne z baseline) — klasa scenow
 potrzebuje albo dużo więcej zdjęć, albo wyższego LR i ~20× nadreprezentacji.
 To samo dotyczy przyszłych klas: sama obecność w miksie nie wystarczy.
 
+### Czwarta iteracja — v0.5: tubki, polskie znaki, branding (2026-09-25)
+
+**Zgłoszenia użytkownika (po teście na telefonie):** „tubkę z maścią nazywa
+butelką”, komunikat startowy zniekształcony („Model gotowo”), zbędne „to może
+być” przy obiektach, polskie znaki w tekście OCR.
+
+**Poprawki aplikacji** (`app/`):
+- komunikat startowy: „Model gotowy. Small LLM by Fabryka AI. Możesz robić zdjęcia.”;
+- `model_router.dart` — usunięty prefiks „Może to być: ” z odpowiedzi SLAYER;
+- `ocr_answers.dart` — leksykon `_polishWords` przywraca ogonki w wyrazach
+  zwracanych przez ML Kit („waznosc” → „Ważność”; nieznane wyrazy bez zmian),
+  a napis zasilania pokazywany w oryginalnej pisowni ze zdjęcia („WŁĄCZ”, nie
+  „WLACZ”). Testy: 6/6 (`flutter test`), `flutter analyze` — 0 problemów.
+
+**Dane modelu:** 4 sceny opakowań leków (`leki/masc` „To tubka maści.”,
+`leki/krople`, `leki/syrop`, `rozne/pasta`), 13 zatwierdzonych zdjęć po recenzji
+(32 pobrane; odrzucono lampy próżniowe zamiast tubek, probówki, reklamy,
+„gel douche”). Zdjęcia scen ×22 w miksie, 800 kroków LR 4e-5/1e-5.
+
+| Benchmark | v0.4 (`run-v4b`) | **v0.5 (`run-v6`)** |
+|---|---|---|
+| Sceny+leki (15 zdjęć) | — (8/15 na v5: „tubka maści” = „butelka”) | **8/15** — „To tubka maści.” ✓, krople ✓ |
+| Obiekty nowe klasy (82) | 63/82 (76,8%) | **66/82 (80,5%)**, F1 0,901 |
+| Obiekty stare klasy (38) | 32/38 (84,2%) | 30/38 (78,9%) — kanapy uciekły w „salon/pokój” |
+
+Naprawione dokładnie zgłoszenie „tubka maści → butelka”. Słabe: tubka pasty
+(jeszcze „butelka”), syrop („łyżka” — łyżka na zdjęciu dominuje), salon,
+przedpokój (→ „korytarz”). Koszt: 2 obiekty ze starego benchmarku.
+
 Przepis iteracji 2:
 
 ```bash
@@ -339,15 +368,15 @@ app/                      # aplikacja Flutter (android + ios)
 
 ## Instalacja na Androidzie
 
-**Pliki do pobrania:** [GitHub Releases — v0.4.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.4.0-objects):
+**Pliki do pobrania:** [GitHub Releases — v0.5.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.5.0-objects):
 
 | Plik | Rozmiar | Zawartość |
 |---|---:|---|
-| `Asystent-wzrokowy.apk` | 224 431 594 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**, nie do Google Play. **Bez zmian od v0.1.0-ocr** (to samo SHA-256) |
-| `SLAYER-Vision-ONNX-IR9-v0.4.zip` | 898 088 877 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.4 (40 klas + sceny wnętrz), `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
+| `Asystent-wzrokowy.apk` | 224 513 514 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**. **Nowy APK** — poprawki: branding „Small LLM by Fabryka AI” w komunikacie startowym, bez „to może być”, przywracanie polskich znaków w OCR |
+| `SLAYER-Vision-ONNX-IR9-v0.5.zip` | 898 088 895 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.5 (40 klas + sceny wnętrz + opakowania leków), `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
 
-Suma SHA-256 APK: `ca5d6daabb1b2b2829de25c6b8849dabd2a370ff5d600bc8b864b70779815797`  
-Suma SHA-256 ZIP: `102b5201af86787a5ecfc2fe3f91ca4fb8aeb6b429819560f0077e5c2e1a1eda`
+Suma SHA-256 APK: `1e8a805b885798d4031c690fafd3d93f29b4f34b19acfdf2469461679dc672fb`  
+Suma SHA-256 ZIP: `5870ff36cc51af47339792fe6271df4b2d61b23d63c596c84e97562fa0ec17d4`
 
 **Wymagania:** Android arm64, kilka GB wolnej pamięci wewnętrznej i dużo RAM;
 telefon Samsung SM-A226B przy próbach zgłaszał zamknięcia `LOW_MEMORY`.

@@ -10,6 +10,22 @@ void main() {
     );
   });
 
+  test('restores Polish diacritics lost by OCR in known words', () {
+    expect(
+      answerFromOcr(AskIntent.readText, ['Waznosc 05.07.2027']),
+      contains('Ważność 05.07.2027'),
+    );
+    expect(
+      answerFromOcr(AskIntent.readText, ['SKLAD: woda, cukier, sol']),
+      contains('SKŁAD: woda, cukier, sól'),
+    );
+    // Nieznane wyrazy zostają dokładnie tak, jak je odczytano.
+    expect(
+      answerFromOcr(AskIntent.readText, ['Xqwert 123']),
+      contains('Xqwert 123'),
+    );
+  });
+
   test('expiry requires the label and a valid associated date', () {
     expect(
       answerFromOcr(AskIntent.expiry, [
@@ -73,6 +89,11 @@ void main() {
       expect(
         answerFromOcr(AskIntent.powerButton, ['MODE', 'OK']),
         isNot(contains('POWER')),
+      );
+      // Oryginalna pisownia z OCR (z polskimi znakami), nie wariant złożony.
+      expect(
+        answerFromOcr(AskIntent.powerButton, ['WŁĄCZ WYŁĄCZ']),
+        allOf(contains('napis WŁĄCZ'), isNot(contains('WLACZ'))),
       );
     },
   );

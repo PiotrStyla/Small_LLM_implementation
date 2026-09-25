@@ -10,7 +10,7 @@ String answerFromOcr(AskIntent intent, List<String> lines) {
   if (intent == AskIntent.readText) {
     return nonEmpty.isEmpty
         ? 'Nie widzę czytelnego tekstu. Zbliż telefon i zrób ostre zdjęcie.'
-        : 'Odczyt z aparatu, może zawierać błędy: ${nonEmpty.join('\n')}';
+        : 'Odczyt z aparatu, może zawierać błędy: ${nonEmpty.map(_restoreDiacritics).join('\n')}';
   }
 
   final folded = nonEmpty.map(_fold).toList();
@@ -53,10 +53,13 @@ String answerFromOcr(AskIntent intent, List<String> lines) {
       }
       return 'Nie znalazłem jednoznacznej kwoty do zapłaty. Zrób ostre zdjęcie całego paragonu.';
     case AskIntent.powerButton:
-      for (final line in folded) {
-        final match = _powerLabel.firstMatch(line);
+      for (var i = 0; i < folded.length; i++) {
+        final match = _powerLabel.firstMatch(folded[i]);
         if (match != null) {
-          return 'Widzę napis ${match.group(1)}. Poszukaj przycisku z tym napisem. Nie potrafię potwierdzić jego położenia ani rozpoznać samej ikony zasilania.';
+          // `_fold` zachowuje długość tekstu — pokaż oryginalną pisownię z OCR,
+          // a nie wariant bez polskich znaków.
+          final shown = nonEmpty[i].substring(match.start, match.end);
+          return 'Widzę napis $shown. Poszukaj przycisku z tym napisem. Nie potrafię potwierdzić jego położenia ani rozpoznać samej ikony zasilania.';
         }
       }
       return 'Nie widzę czytelnego napisu zasilania. Nie potrafię wskazać przycisku na podstawie samej ikony; zbliż aparat do panelu.';
@@ -78,6 +81,43 @@ String _fold(String text) {
     buffer.write(index < 0 ? ch.toUpperCase() : to[index].toUpperCase());
   }
   return buffer.toString();
+}
+
+/// ML Kit zwraca polskie znaki niekonsekwentnie — często bez ogonków
+/// („waznosc” zamiast „ważność”). Przywracamy pisownię wyrazów z leksykonu;
+/// nieznane wyrazy zostają bez zmian (nie zgadujemy).
+const List<String> _polishWords = [
+  'ważność', 'ważności', 'ważne', 'termin', 'przydatności', 'przydatność',
+  'spożyć', 'spożycia', 'najlepiej', 'przed', 'data', 'produkcji',
+  'zapłaty', 'zapłać', 'suma', 'razem', 'należność', 'podatek', 'brutto',
+  'netto', 'gotówka', 'reszta', 'złotych', 'groszy', 'paragon', 'rachunek',
+  'sklep', 'kasa', 'produkt', 'skład', 'cukier', 'sól', 'mąka', 'mleko',
+  'woda', 'sok', 'herbata', 'kawa', 'ser', 'masło', 'chleb', 'mięso',
+  'jogurt', 'lek', 'leku', 'tabletka', 'opakowanie', 'sztuk', 'cena',
+  'włącz', 'wyłącz', 'zasilanie', 'przycisk', 'program', 'pranie',
+  'temperatura', 'kuchnia', 'łazienka', 'korytarz', 'przedpokój', 'pokój',
+  'roślina', 'rośliny', 'doniczkowa', 'kwiaty', 'wazon', 'szafka',
+  'miesiąc', 'rok', 'tygodnie', 'należy', 'przechowywać', 'po otwarciu',
+];
+
+final Map<String, String> _polishByFold = {
+  for (final word in _polishWords) _fold(word): word,
+};
+
+String _restoreDiacritics(String line) {
+  return line.splitMapJoin(
+    RegExp(r'[A-Za-zĄĆĘŁŃÓŚŹŻąćęłńóśźż]+'),
+    onMatch: (match) {
+      final word = match.group(0)!;
+      final restored = _polishByFold[_fold(word)];
+      if (restored == null) return word;
+      if (word == word.toUpperCase()) return restored.toUpperCase();
+      if (word[0] == word[0].toUpperCase()) {
+        return restored[0].toUpperCase() + restored.substring(1);
+      }
+      return restored;
+    },
+  );
 }
 
 final _expiryLabel = RegExp(
