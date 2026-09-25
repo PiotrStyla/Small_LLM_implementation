@@ -98,7 +98,7 @@ flutter_gemma nie obsługuje własnej architektury SigLIP + projector + goLLeM;
 aplikacja składa ją z trzech grafów ONNX:
 
 ```bash
-python -m slayer_vision.export_onnx --checkpoint out/run-final --out out/export-slayer-vision
+python -m slayer_vision.export_onnx --checkpoint out/run-mixed-long --out out/export-slayer-vision-v2
 ```
 
 | Plik | Rola |
@@ -263,15 +263,15 @@ app/                      # aplikacja Flutter (android + ios)
 
 ## Instalacja na Androidzie
 
-**Pliki do pobrania:** [GitHub Releases — v0.1.0-ocr](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.1.0-ocr):
+**Pliki do pobrania:** [GitHub Releases — v0.2.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.2.0-objects):
 
 | Plik | Rozmiar | Zawartość |
 |---|---:|---|
-| `Asystent-wzrokowy.apk` | 224 431 594 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**, nie do Google Play |
-| `SLAYER-Vision-ONNX-IR9.zip` | 832 049 622 B (~794 MiB) | folder `slayer-model/` z ośmioma plikami modelu (~897 MB po rozpakowaniu) i `MODEL-ATTRIBUTION.txt` |
+| `Asystent-wzrokowy.apk` | 224 431 594 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**, nie do Google Play. **Bez zmian od v0.1.0-ocr** (to samo SHA-256) |
+| `SLAYER-Vision-ONNX-IR9-v0.2.zip` | 897 638 257 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.2, `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
 
 Suma SHA-256 APK: `ca5d6daabb1b2b2829de25c6b8849dabd2a370ff5d600bc8b864b70779815797`  
-Suma SHA-256 ZIP: `3b1570ac4956ca0ca0e7b9150283462ee467d6d8265e39673b895f7f5e199592`
+Suma SHA-256 ZIP: `049669037e86f6cd9515edfb93aafd7768d533d58bf322d5b10b95f464b1a06f`
 
 **Wymagania:** Android arm64, kilka GB wolnej pamięci wewnętrznej i dużo RAM;
 telefon Samsung SM-A226B przy próbach zgłaszał zamknięcia `LOW_MEMORY`.
@@ -321,7 +321,7 @@ wyłącznie dla Androida.
 
 | Obszar | Zaobserwowano / granica możliwości |
 |---|---|
-| Podpis zdjęcia | Ewaluacja na 319 przykładach z zamkniętego katalogu scen: **114/319 (35,7%) exact**, F1 tokenów 0,700. To nie jest skuteczność na ulicy. Na żywo rozpoznano kubek i mysz, ale sok nazwano „butelką soli”, zegar „odkurzaczem” (zdjęcie rozmyte), obraz „szafką nocną”. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
+| Podpis zdjęcia | Model v0.2 na niezależnym zestawie 38 przejrzanych zdjęć: **31/38 (81,6%) exact** (baseline 9/38); klasy słabe: pilot, kanapa. Na zdjęciach realnych bywa ucinany kwalifikator („To kostka masła.” → „To kostka.”). Historyczny wynik 114/319 na dawnym `eval.jsonl` dotyczy zbioru z **błędnymi etykietami** (patrz sekcja danych) — nie jest miarą jakości. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
 | Polecenia | SLAYER nie jest VQA i nie potrafi rozumieć swobodnych pytań. „Co jest przede mną?”/„Co to jest?” to ten sam podpis zdjęcia. Tekst/data/kwota idą przez osobny OCR. „Który przycisk?” identyfikuje wyłącznie czytelny napis zasilania; nie wskazuje położenia ani ikony. |
 | OCR | ML Kit Latin działa w release na Samsungu, lecz odręczny numer `12-266-85-28` odczytał jako `R-G6-8S-28`. Reguły dat/rachunków ograniczają zgadywanie, lecz nie naprawiają błędnie odczytanej cyfry. Bez etykiety terminu/kwoty aplikacja odmawia odpowiedzi. **Nie używać samego OCR do decyzji o leku, terminie lub zapłacie.** |
 | Pamięć | Trzy grafy fp32 to ~897 MB na dysku; sesje ONNX na Samsungu osiągały ~0,9–1,1 GB PSS i system zapisał kilka zamknięć `LOW_MEMORY`. Nie ma kwantyzacji ani odciążenia sesji po podpisie. Stabilność długotrwała i działanie na słabszych urządzeniach nie są potwierdzone. |
