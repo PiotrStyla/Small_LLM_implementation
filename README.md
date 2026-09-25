@@ -227,7 +227,51 @@ Dwa skutki uboczne, zmierzone a nie założone:
 Tekst w aplikacji czyta **osobny OCR ML Kit** — żaden z tych przebiegów nie
 zmienia ścieżki OCR ani reguł dat/kwot.
 
-Przepis dla `run-mixed-long`:
+### Druga iteracja — v0.3 (2026-09-25)
+
+Dane rozbudowane: klas obiektów 13 → **40** (jedzenie, kuchnia, dom, ulica),
+kadrów treningowych 192 → **1271** (32/klasę), syntetyka 488 → **660** (80/typ,
+seed 43). Nowy benchmark **82 przejrzanych zdjęć 27 nowych klas**
+(`coco_val_reviewed2.txt`; 22/104 odrzucone przy recenzji, m.in. hot-dog jako
+„kanapka”, szczypce jako „nożyczki”). Trening: 500 kroków (LR 8e-5/1,5e-5)
++ 1000 kroków (LR 4e-5/7,5e-6) ze `run-mixed-long`.
+
+| Checkpoint | Benchmark 38 (stare klasy) | Benchmark 82 (nowe klasy) |
+|---|---|---|
+| `run-mixed-long` (v0.2) | 31/38 (81,6%), F1 0,913 | 2/82 (2,4%), F1 0,482 |
+| `run-v3` (500 kroków) | 33/38 (86,8%), F1 0,932 | 14/82 (17,1%), F1 0,563 |
+| **`run-v3b` (v0.3)** | **34/38 (89,5%)**, F1 0,945 | **40/82 (48,8%)**, F1 0,731 |
+
+Nowe klasy po v0.3: jabłko 4/4, kot 4/4, parasol 4/4, auto 3/4, nóż 3/4,
+piekarnik 3/3, pizza 3/3, łyżka 3/4, pomarańcza 2/3, zlew 2/3; wciąż nie
+nauczone: banan 0/3, pies 0/4, pluszowy miś 0/4, lodówka 0/3, marchewka 0/3.
+**82 zdjęcia to nadal mała próba; 48,8% to nie jest skuteczność uliczna.**
+Dalszy trening potrzebny — to samo zdanie co po pierwszej iteracji.
+
+**Czytanie cyfr przez model** (stary zbiór, sceny kwota/data/cena, 414 cyfr):
+65,5% → **71,7%** trafień pozycyjnych; data ważności 5→8/24 exact, cena 1→3/24,
+kwoty na rachunkach nadal 0/24 (model ich nie czyta — w aplikacji robi to OCR).
+Zdania syntetyczne bez regresji: 35/122 exact, F1 0,830 (v0.2: 34/122, 0,829).
+
+Przepis iteracji 2:
+
+```bash
+python -m slayer_vision.build_dataset --out out/dataset2 --per-kind 80 --seed 43
+python -m slayer_vision.build_coco_objects \
+    --annotations-zip out/annotations_trainval2017-secure.zip --out out/coco-objects2 \
+    --train-per-class 32 --eval-per-class 4 --reviewed-val coco_val_reviewed2.txt
+python -m slayer_vision.merge_caption_sets --out out/mixed2/train.jsonl \
+    out/dataset2/train.jsonl out/dataset2/images \
+    out/coco-objects2/train.jsonl out/coco-objects2/images
+python -m slayer_vision.train --data-jsonl out/mixed2/train.jsonl \
+    --resume-from out/run-mixed-long --reset-optimizer --output-dir out/run-v3 \
+    --steps 500 --batch-size 1 --lr-projector 8e-5 --lr-lora 1.5e-5 --save-every 100
+python -m slayer_vision.train --data-jsonl out/mixed2/train.jsonl \
+    --resume-from out/run-v3 --reset-optimizer --output-dir out/run-v3b \
+    --steps 1000 --batch-size 1 --lr-projector 4e-5 --lr-lora 7.5e-6 --save-every 250
+```
+
+Przepis iteracji 1 (`run-mixed-long`, checkpoint wydania v0.2):
 
 ```bash
 python -m slayer_vision.merge_caption_sets --out out/mixed/train.jsonl \
@@ -263,15 +307,15 @@ app/                      # aplikacja Flutter (android + ios)
 
 ## Instalacja na Androidzie
 
-**Pliki do pobrania:** [GitHub Releases — v0.2.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.2.0-objects):
+**Pliki do pobrania:** [GitHub Releases — v0.3.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.3.0-objects):
 
 | Plik | Rozmiar | Zawartość |
 |---|---:|---|
 | `Asystent-wzrokowy.apk` | 224 431 594 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**, nie do Google Play. **Bez zmian od v0.1.0-ocr** (to samo SHA-256) |
-| `SLAYER-Vision-ONNX-IR9-v0.2.zip` | 897 638 257 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.2, `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
+| `SLAYER-Vision-ONNX-IR9-v0.3.zip` | 898 088 813 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.3 (40 klas), `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
 
 Suma SHA-256 APK: `ca5d6daabb1b2b2829de25c6b8849dabd2a370ff5d600bc8b864b70779815797`  
-Suma SHA-256 ZIP: `049669037e86f6cd9515edfb93aafd7768d533d58bf322d5b10b95f464b1a06f`
+Suma SHA-256 ZIP: `73df609ab87f46180c6535442b09c7d9c0fcd7120f2427579c7f289995ef64e7`
 
 **Wymagania:** Android arm64, kilka GB wolnej pamięci wewnętrznej i dużo RAM;
 telefon Samsung SM-A226B przy próbach zgłaszał zamknięcia `LOW_MEMORY`.
@@ -321,7 +365,7 @@ wyłącznie dla Androida.
 
 | Obszar | Zaobserwowano / granica możliwości |
 |---|---|
-| Podpis zdjęcia | Model v0.2 na niezależnym zestawie 38 przejrzanych zdjęć: **31/38 (81,6%) exact** (baseline 9/38); klasy słabe: pilot, kanapa. Na zdjęciach realnych bywa ucinany kwalifikator („To kostka masła.” → „To kostka.”). Historyczny wynik 114/319 na dawnym `eval.jsonl` dotyczy zbioru z **błędnymi etykietami** (patrz sekcja danych) — nie jest miarą jakości. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
+| Podpis zdjęcia | Model v0.3: benchmark 38 zdjęć **34/38 (89,5%)** (v0.2: 31/38), nowy benchmark 27 nowych klas **40/82 (48,8%)**; słabe: banan, pies, pluszowy miś, lodówka. Czytanie cyfr przez model 71,7% (kwoty na rachunkach nadal słabe — w aplikacji robi to OCR). Na zdjęciach realnych bywa ucinany kwalifikator („To kostka masła.” → „To kostka.”). Historyczny wynik 114/319 na dawnym `eval.jsonl` dotyczy zbioru z **błędnymi etykietami** — nie jest miarą jakości. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
 | Polecenia | SLAYER nie jest VQA i nie potrafi rozumieć swobodnych pytań. „Co jest przede mną?”/„Co to jest?” to ten sam podpis zdjęcia. Tekst/data/kwota idą przez osobny OCR. „Który przycisk?” identyfikuje wyłącznie czytelny napis zasilania; nie wskazuje położenia ani ikony. |
 | OCR | ML Kit Latin działa w release na Samsungu, lecz odręczny numer `12-266-85-28` odczytał jako `R-G6-8S-28`. Reguły dat/rachunków ograniczają zgadywanie, lecz nie naprawiają błędnie odczytanej cyfry. Bez etykiety terminu/kwoty aplikacja odmawia odpowiedzi. **Nie używać samego OCR do decyzji o leku, terminie lub zapłacie.** |
 | Pamięć | Trzy grafy fp32 to ~897 MB na dysku; sesje ONNX na Samsungu osiągały ~0,9–1,1 GB PSS i system zapisał kilka zamknięć `LOW_MEMORY`. Nie ma kwantyzacji ani odciążenia sesji po podpisie. Stabilność długotrwała i działanie na słabszych urządzeniach nie są potwierdzone. |

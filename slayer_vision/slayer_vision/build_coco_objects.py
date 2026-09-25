@@ -38,6 +38,33 @@ CAPTIONS = {
     "book": "To książka.",
     "cell phone": "To telefon.",
     "vase": "To wazon.",
+    "banana": "To banan.",
+    "apple": "To jabłko.",
+    "orange": "To pomarańcza.",
+    "sandwich": "To kanapka.",
+    "carrot": "To marchewka.",
+    "broccoli": "To brokuł.",
+    "pizza": "To pizza.",
+    "cake": "To ciasto.",
+    "bowl": "To miska.",
+    "spoon": "To łyżka.",
+    "fork": "To widelec.",
+    "knife": "To nóż.",
+    "scissors": "To nożyczki.",
+    "microwave": "To mikrofalówka.",
+    "oven": "To piekarnik.",
+    "sink": "To zlew.",
+    "refrigerator": "To lodówka.",
+    "laptop": "To laptop.",
+    "umbrella": "To parasol.",
+    "backpack": "To plecak.",
+    "handbag": "To torebka.",
+    "suitcase": "To walizka.",
+    "potted plant": "To roślina w doniczce.",
+    "teddy bear": "To pluszowy miś.",
+    "cat": "To kot.",
+    "dog": "To pies.",
+    "car": "To samochód.",
 }
 
 
@@ -94,7 +121,7 @@ def _download_crop(session: requests.Session, image: dict, box: list, split: str
 
 
 def build(annotations_zip: Path, out: Path, train_per_class: int, eval_per_class: int,
-          seed: int, reviewed_val: Path | None = None):
+          seed: int, reviewed_val: list[Path] | None = None):
     (out / "images").mkdir(parents=True, exist_ok=True)
     session = requests.Session()
     attribution = []
@@ -113,13 +140,15 @@ def build(annotations_zip: Path, out: Path, train_per_class: int, eval_per_class
                         break
                     if image["id"] in used_images:
                         continue
-                    try:
-                        crop = _download_crop(session, image, box, split)
-                    except (requests.RequestException, OSError, UnidentifiedImageError) as error:
-                        print(f"Pominięto {image['id']}: {error}", flush=True)
-                        continue
                     filename = f"{split}_{image['id']}_{name.replace(' ', '_')}.jpg"
-                    crop.save(out / "images" / filename, quality=90)
+                    target = out / "images" / filename
+                    if not target.exists():
+                        try:
+                            crop = _download_crop(session, image, box, split)
+                        except (requests.RequestException, OSError, UnidentifiedImageError) as error:
+                            print(f"Pominięto {image['id']}: {error}", flush=True)
+                            continue
+                        crop.save(target, quality=90)
                     records.append({"image": filename, "text": sentence, "scene": name})
                     attribution.append({
                         "file": filename, "image_id": image["id"], "scene": name,
@@ -130,7 +159,10 @@ def build(annotations_zip: Path, out: Path, train_per_class: int, eval_per_class
                     used_images.add(image["id"])
                     count += 1
                 print(f"{split} {name}: {count}/{amount}", flush=True)
-                if (split == "train" and count != amount) or (split == "val" and count < 2):
+                # Cel: min(żądane, dostępne); wymagamy 80% — braki w klasach
+                # (np. mysz: 25 kandydatów) to nie awaria pobierania.
+                required = max(2 if split == "train" else 1, int(0.8 * min(amount, len(choices))))
+                if count < required:
                     raise RuntimeError(f"Za mało obrazów dla {split}/{name}: {count}/{amount}")
             target = "train.jsonl" if split == "train" else "eval.jsonl"
             with (out / target).open("w", encoding="utf-8") as destination:
@@ -140,10 +172,12 @@ def build(annotations_zip: Path, out: Path, train_per_class: int, eval_per_class
         for row in attribution:
             destination.write(json.dumps(row, ensure_ascii=False) + "\n")
     if reviewed_val is not None:
-        approved = {
-            int(line.strip()) for line in reviewed_val.read_text(encoding="utf-8").splitlines()
-            if line.strip() and not line.startswith("#")
-        }
+        approved = set()
+        for list_path in reviewed_val:
+            approved |= {
+                int(line.strip()) for line in list_path.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.startswith("#")
+            }
         eval_rows = [
             json.loads(line) for line in (out / "eval.jsonl").read_text(encoding="utf-8").splitlines()
         ]
@@ -174,7 +208,7 @@ def main():
     parser.add_argument("--train-per-class", type=int, default=16)
     parser.add_argument("--eval-per-class", type=int, default=4)
     parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--reviewed-val", type=Path)
+    parser.add_argument("--reviewed-val", type=Path, nargs="+")
     args = parser.parse_args()
     build(
         args.annotations_zip, args.out, args.train_per_class, args.eval_per_class,
