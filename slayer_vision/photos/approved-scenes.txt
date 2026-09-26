@@ -67,3 +67,17 @@ leki/syrop/commons__07.jpg
 rozne/pasta/commons__06.jpg
 rozne/pasta/commons__07.jpg
 rozne/pasta/commons__09.jpg
+rozne/pasta/commons__24.jpg
+rozne/pasta/commons__26.jpg
+leki/syrop/commons__14.jpg
+leki/syrop/commons__16.jpg
+leki/syrop/commons__17.jpg
+leki/syrop/commons__18.jpg
+leki/syrop/commons__21.jpg
+wnetrza/salon/commons__16.jpg
+wnetrza/salon/commons__18.jpg
+wnetrza/salon/commons__19.jpg
+wnetrza/salon/commons__20.jpg
+wnetrza/salon/commons__21.jpg
+wnetrza/salon/commons__22.jpg
+wnetrza/salon/commons__23.jpg

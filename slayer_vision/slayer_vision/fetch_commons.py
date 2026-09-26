@@ -56,7 +56,7 @@ def _api(params: dict) -> dict:
 ENGLISH_QUERIES = {
     "leki/masc": "ointment tube",
     "leki/krople": "eye drops bottle",
-    "leki/syrop": "cough syrup bottle",
+    "leki/syrop": "syrup bottle medicine",
     "rozne/pasta": "toothpaste tube",
     "wnetrza/korytarz": "hallway",
     "wnetrza/przedpokoj": "home entrance hall",
@@ -129,6 +129,10 @@ def fetch(per_scene: int, photos_dir: Path, only: str | None = None) -> None:
         else []
     )
     seen = {entry["file"] for entry in attribution}
+    seen_titles = {
+        (entry["scene"], entry.get("title", ""))
+        for entry in attribution
+    }
 
     for scene in SCENES:
         if only and only not in scene.id:
@@ -167,6 +171,11 @@ def fetch(per_scene: int, photos_dir: Path, only: str | None = None) -> None:
                 license_name = _license_ok(extmeta)
                 if license_name is None:
                     continue
+                title = page.get("title", "")
+                # Ten sam plik źródłowy pod nową nazwą nic nie wnosi —
+                # ostatnia runda pobrała 40 duplikatów w ten sposób.
+                if (scene.id, title) in seen_titles:
+                    continue
                 thumb = info.get("thumburl") or info.get("url")
                 name = f"commons__{got + existing:02d}.jpg"
                 target = scene_dir / name
@@ -190,6 +199,7 @@ def fetch(per_scene: int, photos_dir: Path, only: str | None = None) -> None:
                     "query": query,
                 })
                 seen.add(str(target))
+                seen_titles.add((scene.id, title))
                 got += 1
                 # Atrybucja zapisywana przyrostowo — restart nie gubi metadanych.
                 attribution_path.write_text(

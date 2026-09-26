@@ -314,6 +314,25 @@ Naprawione dokładnie zgłoszenie „tubka maści → butelka”. Słabe: tubka 
 (jeszcze „butelka”), syrop („łyżka” — łyżka na zdjęciu dominuje), salon,
 przedpokój (→ „korytarz”). Koszt: 2 obiekty ze starego benchmarku.
 
+### Piąta iteracja — v0.6: pasta, syrop, salon (2026-09-26)
+
+Kontynuacja „trenujemy dalej” na znane słabości. Dane: kadry COCO 32 → **64/klasę**
+(2665 kadrów; mysz 22 i pilot 61 — rzadkie w COCO), +14 zatwierdzonych zdjęć
+Commons (79 razem; syrop 5, salon 7, pasta 2). Poprawiony fetcher **deduplikuje
+po tytule pliku źródłowego** — poprzednia runda pobrała 40 duplikatów pod nowymi
+nazwami. Zapytanie „toothpaste tube” trafia też w probówki („tube”) i makaron
+(„toothpaste” → „pasta”) — ręczna recenzja pozostaje obowiązkowa.
+
+| Benchmark (te same wiersze) | v0.5 (`run-v6`) | **v0.6 (`run-v7`)** |
+|---|---|---|
+| Sceny+leki (16) | 9/16 (56,2%) | **12/16 (75,0%)**, F1 0,870 |
+| Obiekty nowe klasy (82) | 66/82 (80,5%) | **68/82 (82,9%)**, F1 0,913 |
+| Obiekty stare klasy (38) | 30/38 (78,9%) | **32/38 (84,2%)**, F1 0,916 |
+
+Naprawione: **„To tubka pasty do zębów.”** ✓, **„To butelka syropu.”** ✓, salon 2/2 ✓;
+utrzymane: „To tubka maści.” ✓, krople ✓, korytarz/pokój/kuchnia ✓. Zostało:
+przedpokój → „To korytarz.” (semantycznie blisko), kanapy bywają „salonem/pokojem”.
+
 Przepis iteracji 2:
 
 ```bash
@@ -368,15 +387,15 @@ app/                      # aplikacja Flutter (android + ios)
 
 ## Instalacja na Androidzie
 
-**Pliki do pobrania:** [GitHub Releases — v0.5.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.5.0-objects):
+**Pliki do pobrania:** [GitHub Releases — v0.6.0-objects](https://github.com/PiotrStyla/Small_LLM_implementation/releases/tag/v0.6.0-objects):
 
 | Plik | Rozmiar | Zawartość |
 |---|---:|---|
-| `Asystent-wzrokowy.apk` | 224 513 514 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**. **Nowy APK** — poprawki: branding „Small LLM by Fabryka AI” w komunikacie startowym, bez „to może być”, przywracanie polskich znaków w OCR |
-| `SLAYER-Vision-ONNX-IR9-v0.5.zip` | 898 088 895 B (~856 MiB) | folder `slayer-model/` z plikami modelu v0.5 (40 klas + sceny wnętrz + opakowania leków), `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
+| `Asystent-wzrokowy.apk` | 224 513 514 B (~214 MiB) | aplikacja Flutter arm64 z OCR offline; podpisana **kluczem debugowym**. Bez zmian od v0.5 (to samo SHA-256) — branding „Small LLM by Fabryka AI”, bez „to może być”, przywracanie polskich znaków w OCR |
+| `SLAYER-Vision-ONNX-IR9-v0.6.zip` | 898 569 655 B (~857 MiB) | folder `slayer-model/` z plikami modelu v0.6, `MODEL-ATTRIBUTION.txt` i `coco-attribution.jsonl` |
 
 Suma SHA-256 APK: `1e8a805b885798d4031c690fafd3d93f29b4f34b19acfdf2469461679dc672fb`  
-Suma SHA-256 ZIP: `5870ff36cc51af47339792fe6271df4b2d61b23d63c596c84e97562fa0ec17d4`
+Suma SHA-256 ZIP: `ddca8b540e50a2400d2f36f2a8e852b3db27e19acc332b346ed9208abfbb963f`
 
 **Wymagania:** Android arm64, kilka GB wolnej pamięci wewnętrznej i dużo RAM;
 telefon Samsung SM-A226B przy próbach zgłaszał zamknięcia `LOW_MEMORY`.
@@ -426,7 +445,7 @@ wyłącznie dla Androida.
 
 | Obszar | Zaobserwowano / granica możliwości |
 |---|---|
-| Podpis zdjęcia | Model v0.5: obiekty 66/82 (80,5%) i 30/38 (78,9%), sceny+opakowania leków 8/15 — „To tubka maści.” ✓ (naprawione zgłoszenie „tubka → butelka”), krople ✓, korytarz, pokój, kuchnia, łazienka; słabe: tubka pasty („butelka”), syrop („łyżka”), salon, przedpokój (→ „korytarz”), kanapy bywają nazywane „salonem”. Na zdjęciach realnych bywa ucinany kwalifikator („To kostka masła.” → „To kostka.”). Historyczny wynik 114/319 na dawnym `eval.jsonl` dotyczy zbioru z **błędnymi etykietami** — nie jest miarą jakości. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
+| Podpis zdjęcia | Model v0.6: obiekty 68/82 (82,9%) i 32/38 (84,2%), sceny+opakowania leków 12/16 (75,0%) — tubka maści ✓, tubka pasty ✓, buteleczka kropli ✓, butelka syropu ✓, korytarz, pokój, kuchnia, łazienka, salon; słabe: przedpokój (→ „korytarz”), kanapy bywają nazywane „salonem/pokojem”. Na zdjęciach realnych bywa ucinany kwalifikator („To kostka masła.” → „To kostka.”). Historyczny wynik 114/319 na dawnym `eval.jsonl` dotyczy zbioru z **błędnymi etykietami** — nie jest miarą jakości. Czas odpowiedzi bywa liczony w dziesiątkach sekund. Brak wiarygodnego wskaźnika pewności i filtra rozmazania. |
 | Polecenia | SLAYER nie jest VQA i nie potrafi rozumieć swobodnych pytań. „Co jest przede mną?”/„Co to jest?” to ten sam podpis zdjęcia. Tekst/data/kwota idą przez osobny OCR. „Który przycisk?” identyfikuje wyłącznie czytelny napis zasilania; nie wskazuje położenia ani ikony. |
 | OCR | ML Kit Latin działa w release na Samsungu, lecz odręczny numer `12-266-85-28` odczytał jako `R-G6-8S-28`. Reguły dat/rachunków ograniczają zgadywanie, lecz nie naprawiają błędnie odczytanej cyfry. ML Kit zwraca polskie znaki niekonsekwentnie (bez ogonków) — aplikacja przywraca je wyłącznie dla wyrazów ze swojego leksykonu (`_polishWords` w `ocr_answers.dart`), nieznane wyrazy zostają jak z OCR. Bez etykiety terminu/kwoty aplikacja odmawia odpowiedzi. **Nie używać samego OCR do decyzji o leku, terminie lub zapłacie.** |
 | Pamięć | Trzy grafy fp32 to ~897 MB na dysku; sesje ONNX na Samsungu osiągały ~0,9–1,1 GB PSS i system zapisał kilka zamknięć `LOW_MEMORY`. Nie ma kwantyzacji ani odciążenia sesji po podpisie. Stabilność długotrwała i działanie na słabszych urządzeniach nie są potwierdzone. |
