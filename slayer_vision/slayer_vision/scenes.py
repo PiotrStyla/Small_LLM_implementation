@@ -260,6 +260,7 @@ MISC = _rows("Różne", [
     ("rozne/garnek", "garnek", "To garnek."),
     ("rozne/patelnia", "patelnia", "To patelnia."),
     ("rozne/lustro", "lustro", "To lustro."),
+    ("rozne/sluchawki", "słuchawki", "To słuchawki."),
 ])
 
 INTERIOR = _rows("Wnętrza", [
@@ -283,5 +284,5 @@ SCENES: tuple[Scene, ...] = tuple(FOOD + HEALTH + APPLIANCE + REMOTE + DOCS + MO
 
 CATEGORIES: tuple[str, ...] = tuple(dict.fromkeys(scene.category for scene in SCENES))
 
-assert len(SCENES) == 211, f"Katalog ma {len(SCENES)} scen, oczekiwano 211"
+assert len(SCENES) == 212, f"Katalog ma {len(SCENES)} scen, oczekiwano 212"
 assert len({scene.id for scene in SCENES}) == len(SCENES), "Powtórzone id sceny"
